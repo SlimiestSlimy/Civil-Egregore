@@ -1,1366 +1,279 @@
 AI WORKSPACE -- this file is the AI's own: the design statements as it
-reads them, the rules it works by, what is settled, and what is left to
-do. Plain text on purpose. Read it at the start of every session and
-before every task. What is done leaves it; its history is in git (the
-long version up to d019445).
+reads them, the rules it works by, what is settled and in force, and
+what is left to do. Plain text on purpose. Read it at the start of every
+session and before every task. It stays short: a task done is removed,
+a note that no longer holds is deleted. History is git's (the long
+versions up to d019445, d26a6128 and 54d8ed94); old decisions worth
+keeping are in the AI's memory ("if you want to keep old info from
+AI.txt use your memory", 2026-10-26).
 
-Docs that say the rest: docs/testing_protocol.md,
-docs/glossary.md (one name per thing -- use its names, not the ones in
-its "not" column), docs/design_statements.md.
+docs/design_statements.md is the user's, the only doc left.
 
 
 == THE DESIGN STATEMENTS, AS I UNDERSTAND THEM ==
-(docs/design_statements.md is the user's; this is my reading of it,
-which the user cannot do for me: "its not a checklist, i cant
-interpret it for you". 2026-10-11. To be rewritten as I understand
-more; the file itself is read again at the start of design work.)
+(my reading of docs/design_statements.md; "its not a checklist, i cant
+interpret it for you". The file itself is read again at the start of
+design work.)
 
 What it is: a way of LOOKING, before and while deciding -- at the goal
-as much as at the design. Not six checks to tick after the work: one
-lens with six sides, turned on every part, and turned again on what
-it shows (a statement can send me back to redefine the goal).
+as much as at the design. One lens with six sides, turned on every part,
+and turned again on what it shows. A system: things that do, things done
+to, and the links between them.
 
-A system, in its words: things that do (processes), things done to
-(processees), and the links between them.
+- Epistemology. An unknown I act on decays: implied, then forgotten,
+  then a bug nobody can trace. So an unknown is SAID, where it will be
+  read, the moment it is met: to the user, in AI.txt, in the commit.
+- Change. Whatever moves makes unknowns: who still believes the old
+  thing?
+- Irreversibility. A write loses what was there, a summary loses why.
+  Ask what an action throws away, and whether anyone needs it after.
+- Tradeoffs. Speed, efficiency and correctness buy one another. If
+  something looks free I have not found the price. Name it, then measure.
+- Boundaries. Where the doer and the done-to are cut is mine to choose.
+  A hard problem is often a cut in the wrong place (the pregnant sheep:
+  an entity's act cut along a chunk border).
+- Links. With the cut made, the cost and the gain are in the join. Make
+  the link cheap and both sides get faster.
 
-- Epistemology. What I do not know and act on anyway becomes an
-  assumption nobody said; then one nobody remembers; then a bug nobody
-  can trace. The decay is the point: unknown -> implied -> forgotten
-  -> harm. So an unknown is SAID, where it will be read, the moment it
-  is met -- to the user, in AI.txt, in the commit. Guessing quietly
-  and going on is the first step of the decay, however sensible the
-  guess. (My "Decided on my own" list is this, late; earlier is better.)
-- Change. Whatever moves makes unknowns: a format changed, and every
-  reader of the old one is now wrong without knowing it; a thing made
-  dynamic (attributes at run time, a registry at run time, mods) can
-  no longer be known where the code is written. Each change: who still
-  believes the old thing?
-- Irreversibility. Nothing is done without losing something. A write
-  loses what was there; a sum of an attribute loses which member
-  changed; a queue loses who else wanted the cell; a summary of a
-  session loses why. Ask what this action throws away and whether
-  anyone needs it after.
-- Tradeoffs. Speed, efficiency and correctness buy one another;
-  nothing is free. If something looks free I have not found the price.
-  Name which is being paid for which, then measure.
-- Boundaries. The doer and the done-to are one thing cut in two, and
-  WHERE it is cut is mine to choose: what the instruction knows and
-  what the attribute's definer knows; what a rule does and what the
-  simulation does; which superchunk owns what. A hard problem is often
-  a cut in the wrong place (the pregnant sheep: an entity's act cut
-  along a superchunk border).
-- Links. With the cut made, the cost and the gain are in the join: the
-  lookup from an instruction to the bytes it writes, the queue between
-  superchunks, the walk to an attribute. Make the link cheap and both
-  sides get faster.
-
-HOW THEY GUIDE MY JUDGEMENT (the user: "the most important question
-is: how can the statements guide my judgement?"). They do not decide
-for me; they show what I am not looking at when I decide. I fail by
-weighing too few things more than by weighing badly: left alone I
-look at what I changed, what I made, what I gained, and the parts as
-handed to me. Each statement points at the other side -- what I do
-not know, who still believes what I changed, what I threw away, what
-the gain cost, where else the cut could go, the join and not the
-parts. So they come BEFORE the choice, to widen what is chosen
-among, and again on the result; and on the goal before the design.
-Example: for the pregnant sheep I proposed a general settle pass --
-better inside the cut I was given (a queue a superchunk). The user
-moved the cut (an entity's act is one stream wherever it lands).
-Boundaries, asked first, would have put that on the table.
+They do not decide for me; they show what I am not looking at. I fail
+by weighing too few things more than by weighing badly. So they come
+BEFORE a choice, to widen what is chosen among, then again on the
+result, and on the goal before the design.
 
 
 == ALWAYS ==
 
 - EVERY COMMIT MESSAGE: the user's words, then "Decided on my own:"
-  (above the Co-Authored-By line): one line each, every choice the user
-  did not ask for -- a name, constant, threshold, limit, layout,
-  boundary, default, behaviour beyond the request -- and why. None:
-  "Decided on my own: nothing." Commit and push only when asked, to
-  `main`, the one branch.
-- Testing, committing and pushing are separate commands; the test
-  output is read before a commit. Clippy clean before a commit, on both
-  workspaces (the root's and basegame's). Never `cargo fmt`, never
-  `cargo clippy --fix`. One test run at a time.
-- The fast tiers run in under 60 seconds whole; a test past that
-  shrinks or moves to its crate's complete tier. Time them per test:
-  RUSTC_BOOTSTRAP=1 cargo test --release --workspace -- -Z
-  unstable-options --report-time.
-- Measure before calling a hot-path change done, against the commit
-  before, numbers in the commit: callgrind on AI_SCRATCHPAD's
-  ticks_counted probe (a 4x4 world, every superchunk hot, 250 sheep
-  each, one seed; 2-3 runs a build at 50k ticks, in parallel, the
-  100-tick runs subtracted; the world hash printed to compare builds).
-  perf works too at kernel.perf_event_paranoid 2 ("we can run perfs
-  now btw", 2026-10-24); lowering it is asked first, until a reboot.
-- REMOTE (cloud, no screen): never build Bevy -- never `--workspace`,
-  nor anything naming the client (basegame does); per crate
-  `cargo test --release --offline -p <crate>` (server, protocol,
-  utilities). LOCAL: the window is built and run as usual; test runs
-  are unshown (showing them is LATER).
-- Tests take their seed from utilities/test_seed.rs (TestSeedHandle:
-  transient_data/test_seed.csv, rolled every few counted uses);
-  FREEZE_SEED=0x... pins one, FREEZE_SEED= keeps the file's -- the one
-  environment variable ("that's one environment variable we do need,
-  freeze seed lmao"). The binary never reads repo files.
-- Names long, human, the glossary's ("more than one word"). Files about
-  300 lines: "bellow 400 lines is warning, not refactor" -- 400 and
-  over is split. No macro of our own where a function or a table
-  will do.
-- Refactors through rust-analyzer: AI_SCRATCHPAD/scripts/
-  rust_analyzer_driver.py (rename, move, refs, diagnostics -- one
-  rename per call).
+  (above the Co-Authored-By line), one line for each choice the user did
+  not ask for, and why. If there are none: "Decided on my own: nothing."
+  Commit and push only when asked, to `main`.
+- Testing, committing and pushing are separate commands, and the test
+  output is read before a commit. Clippy must be clean before a commit.
+  Never `cargo fmt`, never `cargo clippy --fix`. One test run at a time.
+- The fast tiers run in under 60 seconds whole: RUSTC_BOOTSTRAP=1 cargo
+  test --release --workspace -- -Z unstable-options --report-time.
+- Measure a hot-path change against the commit before it, and put the
+  numbers in the commit (callgrind or perf; lowering
+  kernel.perf_event_paranoid is asked first). There is no tick probe
+  yet; one comes with real ticks.
+- REMOTE (cloud): never build Bevy. LOCAL: build and run anything.
+- Tests take their seed from utilities/test_seed.rs
+  (transient_data/test_seed.cdnf). FREEZE_SEED=0x... pins one. The
+  binaries never read repo files.
+- Mods are built against the RELEASE game: AI_SCRATCHPAD's `load` runs
+  with --release. After a public change, repackage basegame and
+  ../meadow (`cargo package_mod <folder>`).
+- Names long, human, more than one word. Files are about 300 code
+  lines; under 400 is a warning, and 400 or more is split. No macro of
+  our own where a function or a table will do. Docs live in the code as
+  doc comments, as Rust people do.
 - Every "for later" goes into LATER at once, quoted.
-- This file stays short: a task done is removed, a note that no longer
-  holds is deleted, history is git's (the long versions up to d019445
-  and d26a6128).
 
 
 == SETTLED (in force) ==
 
-THE TREE
-- THE ROOT (since the cleanup, 2026-10-25): a virtual workspace --
-  utilities (the old one, kept as reference but built: "we are also
-  keeping the old utilities as reference" / "but they can compile juat
-  fine so leave them be for now"; cdnf in it, csv gone), protocol
-  (kinds, type_names, manifests, type_registry), basegame (its own
-  workspace), game_packager (stale), AI_SCRATCHPAD (mine, empty;
-  nothing depends on it) -- the version in [workspace.package]; tessera a
-  workspace of its own ("keep in mind tessrra is its own isolated
-  project"); reference/ (not built: compare_and_write/, protocol/,
-  client/ -- "juat archive client and protocol on reference straight
-  up"); docs/design_statements.md alone of the docs; transient_data/.
-  Folders inside a crate are modules, not crates ("we cant have
-  utilities/utilities"). Next: manifest/.
-- LAYERS: utilities, then protocol, then server and client, then mods.
-  "utilities and protocol are.the shared libraries" / "(utilities a
-  level down on protocol of course)"; protocol is not the wire alone:
-  "i think of it broadly. encompassing client and server and mods" /
-  "there is a reason both server and client depend on protocol".
-  protocol::type_registry holds the game's types (IDs, registration,
-  freezing, the shared machinery); protocol::server_types and
-  protocol::client_types hold plain Rust types shared by both sides
-  ("normal rust types are different from what the game itself perceives
-  as types. one is simply types, the other is registered types or
-  frozen types"), each beside its side's kind traits. Kind traits live
-  in protocol ("most definitely"), a side type parameter only where
-  code touches server internals or Bevy.
-- NO GAME CONTENT OUTSIDE BASEGAME (2026-10-17): "NO GAME CONTENT ON
-  SERVER CLIENT OR PROTOCOL, TYPE REGISTRY IS FOR THAT / SERVER IS FOR
-  SIMULATION RUNNING, CLIENT IS FOR RENDERING, PROTOCOL IS THE GLUE".
-  basegame names protocol, the server's simulation_api, the client's
-  client_api, Bevy and utilities ("thats what utilities is for if its
-  not reachable otherwise"); rules reach the simulation through
-  simulation_api alone; nothing depends on basegame but the root
-  program, for now.
-- ZERO HACKS IN THE SERVER: "server is the main thing, we want 0 hacks
-  there" / "we want hacks in basegame, not on server". The server knows
-  a worldgen hook is used, nothing else of it.
-- AVOID SYNC PRIMITIVES (Arc, Mutex, atomics) where a borrow or a move
-  will do: "we want to avoid sync primitives as much as possible";
-  "arcs on the cold side are completely fine".
-- TO THE BONES: "delete dead code, we want to go to the bones".
-- DOCS PAUSED, ALL OF THEM (2026-10-17): no upkeep while the code is
-  hot, root docs included; a rough update only when asked. The docs
-  pointer tests stay ignored.
-
-TESTS
-- A crate's own tests check its invariants; the root's tests/ the
-  higher behaviour, through public APIs alone ("no between ticks work
-  is allowed"): a root test sets up and reads through the probe
-  (tests/shared/probe.rs), a rule of its own bundle "tests first"
-  registered before basegame, run in ticks; asserts outside the tick.
-  The server's tests (server/tests/, declared in its lib.rs) may edit
-  between ticks: they are its invariants' tests.
-- Tiers fine / fast / complete, complete `#[ignore]`d: the root and the
-  server have all three, basegame fast and complete. DETERMINISM: "keep determinism testing
-  server side and worldless if possible, just internal machinery
-  testing" (2026-10-24; the flock over borders, in the server's
-  complete tier).
-- Seeded ("tests should be seed genereated when possible"); types from
-  registering, never hard-coded IDs; a test's own types after a
-  seed-drawn number of fillers. Scaffolding in test files, no
-  production hook for a test.
-- Every test world a folder in transient data, named by its test ("tests
-  make randomly named worlds for testing on transient data. we cant
-  loose more tests"); a test choosing worldgen values writes its mod
-  config there first.
-
-THE TYPE REGISTRY
-- Dynamic, frozen per world before the server starts (REGISTRY FIRST:
-  "the type registry is not initialized until a new world is created or
-  an existing world selected for loading"); "registries are made new
-  for each world opened and any old registries are completely
-  dropped". IDs on demand for a new world, from types.csv for a saved
-  one; "types.csv is the source of truth, for type registry loading"
-  -- a saved name nothing registers fails. After freezing, lookups by
-  ID; "the idea of the frozen registry is to downcast everything
-  possible and remove all indirection".
-- An ID is a kind byte and a 56-bit number, one number a type ("there
-  is one type id for everything"); a plane's width and tile size are
-  registration parameters, carried by its handle (LayerType { type_id,
-  width_bits, tile_scale }).
-- NAMES ARE FINAL (2026-10-24): "type id strings are final, that's why
-  we have a file for them specifically"; "savefiles survive base game
-  uodstes by the same mechanism"; "mods survive uodate thanks to
-  types.csv". SHAPE IS NOT: "mods are expected to migrate their own data
-  on world saves as needed. basegame will do the same as well".
-- BUNDLES: every type in one; names namespaced by the registry
-  (bundle::name; a bare name in a bundle is its own bundle's); nested
-  bundles fine, "only the root level bundles need to be in the
-  manifest"; "no 2 bundles can have the same name". A mod and a bundle
-  are "logically the same thing". Sides: common ("server AND client",
-  or shared libraries -- client calls live there), server, client;
-  each bundle a single library ("1:1").
-- REGISTRATION APART FROM CODE: "we really need to move types strings
-  into the manifest, and just dont involve the libraries at all on type
-  registration, just manifests" -- a library is opened only after the
-  freeze, on its own side; "setup step (2) should not load any
-  libraries". Hooks ("just another parameter on the registry types"):
-  GeneratesTheWorld, RunsEveryTick, KeepsTheWorldHot, ShownByDefault.
-- THE BUILDER (style guide, "not the final form"): builder::new()
-  .new_bundle(..).add("grass", Grass).add(..).close_bundle() -- "a
-  static string that csn ve written straight in the same function call";
-  one function lists a mod's types and their code. Anything callable
-  gets the side's handle at setup ("simulation handle, client handle, or
-  both"), gathers what it needs and keeps it ("that downcasting example
-  for rules is exactly the approach we need"). Reads are declared per
-  rule at setup and fixed for now; a frame asks for the union of the
-  active render rules' reads ("simple is better now").
-- CLIENT CALLS: a ClientCall type a function, by ID, words in and out,
-  between ticks, opt in ("basically a security feature"); callable in
-  process too. A call gets its mod's config folder.
-
-WORLDS
-- THREE STEPS: create (the folder, superchunks/, mods/, mod_config/,
-  world.csv with the seed -- "seed draw should.be happening on step 1"),
-  set up (types.csv; mods into mods/ and basegame in or out, with
-  runtime loading -- "never basegame" copied; leaving it out is "a
-  separate flag"), run ("existing worlds just skip straight to run").
-  Never run = no hot file. world.csv is format 7: format, seed, tick and
-  the flag rows. "honestly, we csn slowly remove memory only worlds": no
-  world without a folder.
-- MOD CONFIG on disk alone, in <world>/mod_config/<mod>/, read by the mod,
-  never the server; "if no config is provided worldgen can use a default
-  config". A reset keeps the frozen registry: the world unrun and run
-  again in its own folder.
-- A server process runs one world; another world is another process. On
-  client disconnect, everything is dropped and the client goes back to
-  the main menu. Mods are folders, per world; "the files must be
-  preinstalled on both client and servee beforehand"; a remote world's
-  mods in client/worlds/<world>/.
-- A world ID, the creation time and the name, in world.csv ("guaranteed
-  to never conflict"): not written yet.
-
-THE SIMULATION
-- THE SIMULATION HANDLE owns a world's state and does everything to it:
-  "server is a coordinator, not a doer"; "anythong in between ticks is
-  internal simulation api". A rule gets a SimulationTickState (one
-  superchunk's turn) and its RuleContext.
-- SUPERCHUNKS ARE WHAT MATTER: 1024x1024 cells; a chunk (256x256) is
-  "just a storage convenience to keep tessera happy". APIs by superchunk
-  and CellIndex.
-- WARMING, EXACTLY 256 TICKS: "superchunks must load in exatcly 256
-  ticks after they start warming or the simulation stalls completely,
-  never more, never less"; the server stalls at tick 255 for a job not
-  done. Generating is warming ("instead of tsking the data from the save
-  file we take it from the worldgen hook"): one warm job a superchunk,
-  from the cooled arena, the store, or the worldgen hook, built off the
-  tick into the arena's own Superchunk and the store's own
-  SuperchunkEntities, adopted at the due tick. Never half generated.
-  The worldgen writes through the server's own APIs ("thats what hooks
-  are for"); writes outside its superchunk are not applied; entities
-  through the store's builder, FirstWake making a wake before first hot
-  impossible. Warming and cooling are the halos' job, forced hot and the
-  camera too. A save and load as if nothing went cold ("thats exactly
-  why we keep the list of hot chunks").
-- ATOMIC COMPARE-AND-WRITES: every write under a compare, everywhere.
-  SKIP TAGS (the user's design): SetSkipTag before a chain of compares;
-  writes are methods of SkipTagSet only ("we can't have naked writes").
-
-THE CLIENT
-- Bevy is in the client's public API ("bevy is part of our public api
-  wether we want it or not"); basegame's render rules and gui types are
-  Bevy code ("bsse game can depend on bevy itself"; no shading language
-  of ours). At the 0.7 freeze, Bevy pinned to its exact version.
-- A render rule is code for one thing; the client loops ("we use the
-  same approach server has"), at a detail level matched to the zoom; an
-  image a superchunk a render layer, stacked by render layer number
-  ("things that render should include a render layer number").
-- THE INVARIANT: "the rendering main priority is not stalling the server
-  at large zoom out levels, while keeping roughly the same fps, our fps
-  target is 60"; "that's why today the server doesn't answer a whole
-  frame at once at large zoomouts". Vsync on; "no graphic settings on
-  the basegame".
-- GUI: "a simple draggable windows with a grid inside", gui types
-  nested by naming their parent, libraries for their dependants; the
-  window system one, in the client.
-- The window's test world: limitless, no sheep, the camera forcing
-  superchunks hot.
-- COMMS: TCP on loopback, port 11235 ("i like my fibonaccis"); one
-  client for now, which alone may make, open, save, reset, pause; a
-  client joining late gets the world's frozen types first;
-  --close_if_no_clients (a 30 s wait) for a server a client started;
-  a headless server given nothing prints its help.
-
-MODS AND THE GAME FOLDER
-- Two binaries: "the client always needs bevy, the server never needs
-  ir"; "zero clients mods to load zero bevy code on server side". The
-  game shipped as a folder: the binaries, the engine's libraries (each
-  crate a Rust dylib, prefer-dynamic, $ORIGIN), libstd, basegame's
-  library. "the game folder is static after compilation".
-- THE MANIFEST: "in it we trust, if the libraries dont match the
-  manifest we refuse to load / the manifest becomes the source of truth
-  for the mod"; it names each bundle's entry, a struct implementing the
-  bundle trait (Fabric's model: "the manifest file has a string that
-  points to the entry point struct"). Load order by dependency, then
-  name ("simple ordering by dependency and name is fine"); bundles list
-  the bundles they depend on.
-- BUILDING A MOD: against the game as compiled on the modder's machine
-  ("we can expect modders to compile the game in their machines"),
-  never its source; the engine's crates and the game's include fragment
-  by plain relative paths ("cant we just work with paths", "Ideally we
-  avoid any crstes.io interactions at all lol" / "and fail instead"); no
-  Bevy in a mod's Cargo.toml (the kit route). "we want mod source code
-  to be free of restraints"; the setup "simply specifying the root of
-  civil egregore local repo". Mods never inside the game's repository.
-- THE PACKAGERS: Rust binaries, std only, run by cargo aliases; "avoid
-  using script files of any kind (cmd, shell, etc) and avoiding third
-  party libraries". game_packager (`cargo package_game`) lays out
-  target/civil_egregore/; mod_packager (to come) builds the game if need
-  be, writes the manifest, lays out the mod in its own target/<mod>/.
-  Release only for now. A mod template workspace in the tree, basegame
-  "basically a copy of it".
-- VERSIONS: 0.8 the server, 0.9 diagnostics back ("yeah, thats something
-  we also want to measure once we have diagnostics back on 0.9, 0.8 will
-  be the server version it seems", 2026-10-26: the split queues measured
-  then). Now 0.7.5 ("nice, bumpt the version to 0.7.5, and push",
-  2026-10-26: the game packager fixed, game_distribution, dependency
-  sources); 0.7.1 ("yes, thats 0.7.1 btw", 2026-10-26: the mod
-  template, `cargo package_mod new`); 0.7.0 ("i believe we deserve that
-  0.7 before commit and push haha", 2026-10-26: basegame and meadow
-  packaged as mods, loaded from their zips); was 0.6.5293 ("decided now. were on version
-  0.6.5293, why? idk", 2026-10-24): "we should have a single version on the root crate"
-  -- the root Cargo.toml's alone; basegame "still follows the root
-  version so it doesn't carry one of its own even if it acts as a
-  separate workspace"; tessera its own (its own project). "freezing the public api will be our 0.7 moment" -- "the
+THE TREE (2026-10-26)
+- The root is a virtual workspace. Its members: utilities (archive,
+  chance, coordinates, dynamic_library, rng, ...), protocol (kinds,
+  manifest_format, manifests, packages, simulation_time, type_names,
+  type_registry), server (step 3 below), game_packager,
+  game_distribution, mod_packager, and AI_SCRATCHPAD (mine; nothing
+  depends on it). Workspaces of their own: tessera, cdnf (its rules in
+  cdnf/cdnf.cdnf), and basegame (a common container mod: basegame_common
+  and basegame_server). meadow lives outside the tree at ../meadow, the
+  off-site mod. reference/ holds the old code and is not built: hindsight.
+- Aliases: `cargo package_game`, `cargo package_mod <folder>` (and
+  `cargo package_mod new <folder> <side>`), `cargo distribute_game`.
+- Version 0.7.5. 0.8 will be the server, 0.9 brings diagnostics back. "the
   public api is stable for a given distributed version of the game,
-  between versions it csn change, this is a game, not an operating
-  system"; 0.7 the first version with mods, then content. Breaking
-  changes "until 1.0 at least ... we probably going to get to 0.20
-  before 1.0"; "why do we need versioning support and safeguards if we
-  dont even have mods or saves to version?" World formats not
-  stabilized: no backwards compatibility for saves yet.
+  between versions it csn change". World formats are not stabilized.
+- Third-party crates: libloading and sha2, declared once at the root.
+
+PRINCIPLES
+- No game content outside basegame. Zero hacks in the server ("we want
+  hacks in basegame, not on server"). Avoid sync primitives where a
+  borrow or a move will do. "delete dead code, we want to go to the
+  bones". "each thing we add to make things simpler or leave them equal
+  at least, thats tye reason we're building the game from the tail".
+- Procs see type IDs, never internal indices: "wat a proc sees and talks
+  with its typeids. not internal array indices".
+- No floats in what a world follows from (clippy.toml): whole numbers,
+  utilities::chance.
+
+MODS (how and why in memory: mods-why-one-crate,
+mods-built-against-the-compiled-game)
+- A mod is one crate and one library (or none, for a container), with
+  one side (common, server, client). Full names are `mod>type`, made
+  only of A-Z a-z 0-9 _. A mod depends on its own side or common; "a
+  container mod simply specifies a side to constrain its carried
+  dependencies", and a common container may carry anything.
+- premanifest.cdnf (written by hand) goes through the mod packager and
+  becomes manifest.cdnf (written by the CDNF writer, with SHA-256 hashes
+  `0x...`), all inside a stored zip. Dependencies' zips go in the mod's
+  dependencies/, with versions on both sides.
+- THE CHAIN: CDNF, then protocol::manifest_format (the shared reader),
+  then manifests (checks of one mod, then across mods), then the type
+  registry (a flat list: IDs, full names, no checks). Then loading:
+  libraries out of the zips, set up mod by mod, dependencies first. Each
+  type's `set up` is #[unsafe(no_mangle)], named in the manifest.
+- Kinds: common -- plane, attribute, client call; server -- entity,
+  entity proc, sca proc, worldgen; client -- render proc, gui. An entity
+  proc names its entity. A sca proc names its `planes` (one or more) and
+  its `seconds per sample`.
+
+THE SERVER (0.8; design in force)
+- CHUNKS: a chunk is 1024x1024 cells (formerly the "superchunk"; "lets
+  rename superchunks to chunks"). A CellIndex is the 44-bit chunk index,
+  then the 20-bit place in its chunk, in Morton order. Threads work per
+  chunk.
+- HOT STORAGE: each chunk keeps only the planes that have a tile that is
+  not 0, sorted by TypeId. Each plane is dense ("only sparse when we
+  need it to be, ie later"), packed by width, in Morton order, with an
+  exact count of tiles that are not 0 (sampling goes by it). A plane
+  that empties is dropped at the tick's end. Tiles are aligned, with no
+  shift.
+- SAMPLING: "lets just use the count and loop over each value on a
+  sampleable plane, completely wasteful, incredibly simple". The rate:
+  "mean time per sample on simulation seconds per sampleable cell".
+  Read as an exact decimal, no floats ("floating point numbers ... are
+  not machine portable"), and rounded to a Chance per tick (out of 2^32;
+  1 second at 256 ticks a second is 1/256). "the simulation second is
+  chanhed in code to 128, and everything else simply derices from it" --
+  protocol::simulation_time. Hits are Morton cell indices.
+- THE INSTRUCTION: 32 bytes -- the opcode (u8) and the tile (u32, its
+  place in the chunk), the TypeId (u64), and the data ([u64; 2]). Public
+  opcodes: compare (equality), write, skip tag. Internal ones, added at
+  step 4 by a processing step at queue time: atomic and fence. "leta go
+  with 32 bytes then"; measure it against split queues at 0.9.
+- FLAT SKIP TAGS: a compare that fails skips past the next skip tag.
+  Tags are unnumbered and never nest ("do we need to number skip tags at
+  all? maybe not lol"); compares are duplicated where needed. "having
+  many compares one after another all leading to the same skip tag is
+  necessary to check larger pieces of data". HARD RULE: every write is
+  under a compare, in every queue (memory: atomic-compare-and-writes).
+- THE SCA PROC: `trait ScaProc: Any + Send + Sync { fn call(&self,
+  server: &mut ServerHandle, sampled_plane: u64, tile: CellIndex) }`.
+  The export is a Box<dyn ScaProc>; mods reach their own type by
+  upcasting to &dyn Any. "trait objects have to be, thats the crux of
+  the server interface". Procs run by TypeId, each over its hits in
+  Morton order.
+- THE SERVER HANDLE: "basically a reference to all chunks (read only)
+  plus the instructions queue references, 8 neighbor queues and the
+  current chunk queue". Queuing is "just another type state construtor
+  from the serverhandle". A bad instruction (not a plane, a value too
+  wide) panics: "yeah panic that mf". READS: Result<u32, NotHot>. A plane
+  the chunk doesn't keep reads Ok(0); a chunk that isn't hot, or one past
+  the world's edge, is NotHot ("reada should fail on non hot chunks").
+  Compares in a chunk that isn't hot fail.
+- A CHUNK'S RANDOM STREAM: "a seeded random stream, which is where each
+  chunk gets its random numbers from" -- RandomSource::for_stream(world
+  seed, chunk index), taken for the tick and given back.
+- ACROSS CHUNKS (step 4; the user's design, 2026-10-24/26): "we need
+  compares on multiple queues to die together. thata were atomic compares
+  come in". There are 9 queues, and each chunk applies only its own
+  cells, in the one order. A set that spans chunks is gated by a counted
+  atomic: "we need to count up to the amount of compares tied to the
+  atomic, plus a bool that says if any failed so we abort inmediatly" /
+  "at least 2 new types of compare, compare and update atomic and
+  compare atomic (expected equals atmoc count, the last gate before
+  writes are allowed to proceed)" / "an atomic is always tied to a skip
+  tag". The lowering happens only where needed: "the public compare and
+  write api is oblivious to superchunk boundaries". "yeah we have to wait
+  on the atomic bruv"; a waiting chunk parks. "compares without writes
+  are valid in this model". The tenth queue is gone. Entities across
+  chunks: memory, entities-across-chunks-design.
 
 
 == TO DO ==
 
-NOW
-- THE CLEANUP (2026-10-25), after the exp-newserver branch's rewrite:
-  "this experument told me something, we need to rewrite a lot of stuff
-  from scratch, but we need to follow another direction this time. were
-  going to cleanup all main code except a few specific things: type
-  registry core code / client (were basically not going to touch it) /
-  the compare and write builder and a minimal amount of core logic to
-  make sense of it later" / "utilities do stay lol. keep the client on
-  life support otherwise" / "this also means deleting basically all
-  docs" / "tessera stays as well". The builder to a reference folder;
-  root src/ and tests/, docs/ deleted with server and basegame; on main,
-  exp-newserver kept as is. Decided on my own: protocol whole kept (the
-  client builds on its pipe, parameters and world types; "protocol's
-  server parts" was not picked to go); docs/design_statements.md kept
-  (the user's file); game_packager kept, stale (it packages
-  Civil_Egregore and libserver); AI_SCRATCHPAD emptied of its probes.
-- THE OTHER DIRECTION (2026-10-25): "were going to make a new moduke on
-  root called manifest, which will be the reader of the manifest, then
-  were going to take the type registry out of the protocol (for a while)
-  so its isolated and make it consume the manifest output". "manifest is
-  just a parser to give everything validated to the type registry, its
-  checks are completely external side looking, checking that a manifest
-  is valid, that the libraries match whats in the manifest. the type
-  registry simply recieves a list of safemanifests the validated
-  structure of a mod". "we're not uaing csv this time its over for csv".
-  The format: "Fresh, discussed first". Co-op file by file. The registry
-  is out of protocol already (type_registry/, as it was, saved_types
-  still on utilities::csv); protocol and the client archived in
-  reference/, the Bevy lines the client needs kept in reference/README.md.
-- THE MANIFEST, settled so far (2026-10-25): written in CDNF, the user's
-  own "Colon Dash and Newline Format" (example.cdnf at the root). A mod
-  declares only its name for now ("yes all of that later. for now just a
-  name lol"). Flat: "keep it flat yes, a mod now is a bundle container
-  basically". Libraries checked by the file's hash: "hashing of the file
-  bro validation is not loading and we dont need it to be lol". Every
-  type says its kind and that kind's fields: "how do we know the kind
-  otherwise? every kind needs to register different data". Fields are
-  list items ("yup, lists"): a pair's right side is a text body, which
-  runs on over contiguous lines. "bundles are sections yes, but types are
-  just a string with a paired list". "hooks is another nested list,
-  listing the hooks for that thing. later the manifest crate verifies the
-  correct hooks per kind". "library paths relative by to the manifest by
-  default". The kinds and their fields, "yea": plane (width, tile size),
-  entity (default attribute optional, rule), attribute (blocks, data
-  words), entity proc, sca proc, worldgen, client call (none), render
-  rule (draw order), gui (parent optional). Masters gone.
-  "cdnf just parses the file, so ita cdnf valid, manifest verifies its
-  registry valid before any registry ever touches it" -- the hooks per
-  kind checked there. THE CHAIN: "the result of a manifest check is a
-  safemanifest, which is converted into a typeregistry (what was a
-  frozen registry before) which then is what loads the libraries and is
-  passed to server or client or watever" -- no open registry phase.
-  Why not one step: "separating it like this basically makes sure the
-  code is very decoupled, manifest checks validity of manifest totally,
-  registry is simply in charge of loading and providing, and can omit
-  all checks since manifest does them first". The checks across mods
-  (dependencies, cycles, references, unique names) are the manifest's
-  too ("yea thats manifest"). Sides: "common is basically to define
-  client calls or common types and everything else is best done on
-  client or server" -- common on common only, server on common and
-  server, client on common and client.
-  NAMES: "we use string in the same manner, but instead of using double
-  colon we use > / so sheepbundle>sheep is the ship string from outside
-  the sheepbundle, inaide the sheep bundle is only sheep the only
-  characters allowed on type string are Aa-Zz 0-9 - or _". Mod and
-  bundle names too ("yes"). Reach: "only dependecies explicitly listed
-  may be used" -- a type names types of its own bundle, or of a bundle
-  its bundle lists in depends on, never further.
-- THE NEW PROTOCOL (2026-10-25): "lets actually drop "safe" from manifest
-  wording lol" / "instead of having a custom enum, we now make the
-  protocol crate, and fold both manifest and cdnf into protocol, we add
-  another module into protocol called kinds, and there we define the
-  kinds, this kinds types will be equivalent on the type registry and on
-  the manifest". protocol/ (fresh; the old one in reference/protocol):
-  cdnf, kinds (Kind, Hook), manifest (Manifest, Bundle, Type, Side,
-  ManifestError), type_names (TypeName, NAME_SEPARATOR, is_a_name).
-  Next: manifest's reading and across-mods checks, then the registry
-  made of Manifests, its own kind enums replaced by protocol::kinds.
-  Kinds per side ("1 yes"): common -- plane, attribute, client call;
-  server -- entity, entity proc, sca proc, worldgen ("entities are
-  something very specifically server side, as rules are as well" / "what
-  i said is common has common types, i dont recall saying entities
-  specifically"); "rules come in 2 specific types, entity rules or sca rules
-  specifically (or render rules of course, ignored for now), there are no
-  plain "rules""; and then: "lets take a moment while the code is smalk and
-  rename rule/rules to proc/procs if it doesn't conflict with anything
-  like macros or watever lol" -- EntityProc, ScaProc, RenderProc; an
-  entity's field "entity proc" first, then turned round: "this means
-  rules list the entity to be run on, which also means entities can have
-  multipke rules which we also need for future stuff" -- an entity proc's
-  field "entity", the entity none; sca procs name nothing: "sca procs can work across many
-  planes. not just one. and sca procs are sampled automatically, entity
-  rules need to list their entities because entities work on wakeup
-  semantics, ao the server needs to know what to run for a given entity
-  on a wakeup, think of it as hooking procs to entities lol";
-  FULL NAMES (2026-10-25): "names have to be mod>bundle>type, because
-  across mods bundle names may repeat. the mod name is the widest
-  namespace layer that cannot collide never, however only bundles are
-  types, a mod is just a namespace and a container basically". In a
-  manifest: type alone in its bundle, bundle>type in its mod,
-  mod>bundle>type from another; depends on: bundle, or mod>bundle.
-  Kind::Bundle(BundleFields) in kinds (Side there too).
-- THE REGISTRY (2026-10-25): "once the vec of manifests is handed to type
-  registry, it means it passed all validations. and the type registry
-  basically juat copies the manifests data into a flat lists of types
-  with assigned ids and their full strings per type (including bundles,
-  those are also types/kinds) / no checks needed, all data is assumed
-  valid" / "Basically is just the "making the flat list with ids and
-  full qualified string names for everything" and thats it. because the
-  next step would be loading and downcasting, which we need real mods to
-  make first". IDs in order, fresh: "because at world creation this same
-  process is what runs the first time to make types.csv"; one counter
-  for all kinds, the kind's byte over it. Then: "fold cdnf.rs and manifests.rs into
-  their folders lol / type registry is also a module of protocol" --
-  protocol/src/{cdnf,manifests,type_registry}/mod.rs; no type_registry
-  crate.
-- LOADING AND SETUP, THE MODEL (2026-10-25, design, nothing written):
-  pure Rust between game and mods, no C-style bindings: "we compile mods
-  against the game source code and compiler the game is built on,
-  remember, so we can avoid using c style bindings and remain pure rust"
-  (opening the file is the OS loader's: dlopen/dlsym declared by hand,
-  no crate). Three handles: type registry, server, client. "we care
-  about being able to downcast stuff so mods dont have to do downcats
-  when calling their dependencies every time ... the type registry
-  handle, which has the pointers ids and strings for everything. thats
-  where we get our pointers to stuff to downcast in the first place ...
-  this process produces a lot of new stuff which is basically more
-  pointers to functions, but this time not dynamically dispatched. and
-  this ia where the real proc code lives ... what cant be downcasted ie
-  specific plane access inside the server ... are indexed by id acquired
-  from the type registry at load/setup time" / "the server cant downcast
-  a sheep call to a function receiving a sheep ... so general public api
-  serverhandles are always given for things like entity o sca procs, but
-  also gives rules freedom to the whoke server api". "setup only
-  receives typeregistry, server handle is what server kinds receive on
-  the fixed signature. common side bundles dont have code that recieves
-  neither client nor server handles btw. mostly useless for now, much
-  more useful later i swear". Server kinds' code types (traits, fixed
-  signatures) in the server, client kinds' in the client: "the same will
-  be done with client along with its types because of bevy, so lets also
-  move the respective types to server anyways for parity". My proposal:
-  every bundle library exports bundle_exports() (name -> Box<dyn Any>,
-  for dependents to downcast) and bundle_set_up(&TypeRegistryHandle)
-  (name -> built code, which the side downcasts once to its own trait
-  object). How a client call, a common kind, reaches the server: put
-  off, see LATER. The loader: "lets put the loading utility in the
-  utilities folder, that decouples the code from protocol and we can
-  later adapt the utility to work with windows or Linux automatically"
-  -- utilities::dynamic_library (DynamicLibrary::open, ::function),
-  dlopen/dlsym/dlerror declared by hand, RTLD_NOW, never closed.
-- BASEGAME, THE FIRST MOD (2026-10-25): "lets name it basegame, but lets
-  make something stupid basic, because well also make the mod template
-  from it lol, and also model the mod pacjager with it" / "just grass no
-  entities is even simpler". basegame/ its own workspace, a crate a
-  bundle (common/, basegame_common, a dylib); manifest.cdnf and its hash
-  by hand for now (AI_SCRATCHPAD hash <file>; load <side> <mods>...).
-  FOUND: built from protocol's source in its own workspace, cargo gives
-  protocol another -C metadata -- another crate, TypeIds apart, the
-  downcast fails, and target/release/libprotocol.so overwritten. So, as
-  settled before ("against the game as compiled ... never its source"):
-  no dependency on the game in a bundle's Cargo.toml; --extern
-  protocol=../target/release/libprotocol.so and -L
-  dependency=../target/release/deps in basegame/.cargo/config.toml,
-  target-dir ../target, the game's flags read from the root's config.
-  Then grass's export downcasts on the game's side to protocol's
-  TypeName. Each bundle's bundle_set_up (BUNDLE_SET_UP, BundleSetUp)
-  returns its code by name; protocol::type_registry::load(side) opens
-  the common and side bundles, dependencies first, first by name, and
-  refuses code for a type the manifest lacks, or none for a kind with
-  code (entity proc, sca proc, worldgen, render proc, gui). Only bundles
-  carry a path: "yes, only bundles should carry the paths lol" -- the
-  registry makes a bundle's library path whole, its mod's folder joined.
-- ONE WORLD A PROCESS (2026-10-25): "there is one world per process,
-  opening a new world is closing the server, and opening a new one from
-  0. this is obligatory, not optional" / "the server is also just one per
-  process, one registry, one server one worlx". The handles as statics
-  weighed and let be: "maybe we dont need to do this static stuff at
-  all, the code works just fine already lol" -- they stay parameters. A
-  proc's server handle: the world read-only (&, the read phase), its
-  thread's queue its own (&mut).
-- TWO MODS (2026-10-25): "just basegame mod should be in civil egregore,
-  this s3cond mod should be out of tree". basegame>server, a sca proc
-  grass_seen downcasting basegame>common>grass's export at set up: one
-  bundle on another, in one mod; the client side loads common alone. And
-  meadow, out of the tree at ~/container/programming/Rust/meadow ("where
-  ok" / "meadow is fine, we just want to make sure the downcats work
-  across mods lol"): one server bundle, meadow_grows, downcasting the
-  base game's GrassSeen; --extern protocol and basegame_server from the
-  game's target/, the game's flags said again in its .cargo/config.toml
-  (outside the tree, the root's config is not read). Loaded with
-  basegame: the downcast holds across mods; alone, refused (depends on
-  basegame>server: no such bundle). The folder's rename to
-  civil_egregore: "do the folder name change later yes" -- at a
-  session's end, my memory copied to the new path first.
-- A MOD BUILT ON ANOTHER MACHINE (2026-10-25, "i can start a remote
-  session"): AI_SCRATCHPAD/FOREIGN_MOD_TEST.md walked a fresh remote
-  session through building the game, basegame and an out-of-tree mod
-  foreign (one server bundle downcasting basegame's GrassSeen); it
-  pushed the built library to the branch foreign-mod-test. Copied here
-  and loaded with this machine's basegame: 3 libraries loaded, the
-  downcast held. -C metadata the same on both machines (utilities
-  4362a3fed97132b8, protocol 49fc914d70399142, basegame_server
-  38514cd5050192e0) though the repository's absolute path differed and
-  the libraries' bytes did too: the metadata takes the compiler's
-  version and the crate's place in its workspace, not the machine. The
-  remote's rustup default (1.97) failed the mod's build -- a mod outside
-  the tree does not see rust-toolchain.toml (in LATER).
-- THE MOD PACKAGER, STEP 5, REDONE (2026-10-26): no manifest builder,
-  no macro -- "make the packager do all those checks, make the manifest
-  written by hand by the mod, but excluding hashes and all that stuff,
-  basically a "premanifest.cdnf" which later the mod packages checks by
-  hand basically" / "i think its a sound plan". (On the way: a builder
-  taking the function itself needed no macro, std::any::type_name giving
-  its path -- moot now.)
-  ONE MOD, ONE CRATE (2026-10-26; replaces bundles): "a mod is a bundle
-  is a crate, a mod as a unit is also a bundle, and also compiles to a
-  single library file. its extra work to change how manifests work but i
-  actually think this might just solve all the issues we have and keep
-  the bundle grained loading which is important for sides". Why: a
-  library's dependencies are recorded by name alone (NEEDED on Linux,
-  the DLL's file name on Windows), the first loaded of that name taken --
-  tried 2026-10-26, two libplanes.so in two folders: a library linked to
-  one got whichever loaded first. So a library's name must be unique in
-  the process; <mod>_<bundle> clashed (a_b>c and a>b_c); per-bundle
-  `depends on` said again what Cargo.toml said, unchecked. Bundle-level
-  dependencies were never "bundles rather than mods" but "bundles rather
-  than types" (2026-10-19), and sides: "that reason is tied to bundles
-  sides, because every bundle has a side, and we want to load only whats
-  needed for a given side". Now:
-  - a mod is one crate, one library (or none), one side. Its crate's name
-    is its name, its library lib<name>.so (std's DLL_PREFIX/DLL_SUFFIX)
-    -- no `library` field. Mod names are crate names (A-Z a-z 0-9 _),
-    unique in a world, none of the game's crates' (protocol, utilities,
-    cdnf, std, core...).
-  - full names `mod>type`. One section, the mod's: its fields' list
-    (side, version, depends on, hash...) and its types.
-  - `version` in every manifest, an exact string. `depends on` on both
-    sides with versions ("we rather specify a version string on both
-    sides now rather than later"). DEPENDENCIES' ZIPS IN THE MOD'S
-    dependencies/ (2026-10-26): "we need to properly define how to import
-    depends on as well, probably just providing the zip files in a folder
-    inside the mod crate is plenty. carried dependencies are provided the
-    same way for consistency? we also actually need to carry version on
-    the premanifest on both as well dont we? to validate version strings
-    on whats in the premanifest vs whats on the dependencies" -- the
-    mod's crate holds dependencies/<name>.zip for every mod of both lists
-    (the same folder name a package has inside); both premanifest lists
-    are name : version, as the manifest's; the packager checks each
-    listed name has its zip, the zip's manifest that mod at that version,
-    and no zip there unlisted. No paths in a premanifest. A container's
-    carried mods come in its zip (meadow's dependencies/ holds
-    basegame.zip alone). NO PATHS, NOT EVEN OPTIONAL: "maybe we just
-    skip it and just make the mod developer has all its dependencies on
-    the project dependencies folder, basegame as well if needed, it
-    simplifies things tbh" -- basegame_server's dependencies/ holds
-    basegame_common.zip, copied after packaging it. THE PACKAGER'S FLAGS
-    BY CARGO_ENCODED_RUSTFLAGS (2026-10-26; was its own
-    .cargo/civil_egregore.toml): basegame, inside the game's folder, read
-    the game's .cargo/config.toml, whose target.<triple>.rustflags drop
-    every build.rustflags -- the packager's --cfg and --extern lost,
-    protocol built from source, the set up check's E0460 caught it; a
-    developer's ~/.cargo/config.toml would do the same. Now cargo runs
-    with CARGO_ENCODED_RUSTFLAGS (every config's rustflags give way) and
-    --target-dir <mod>/target/civil_egregore_build (cargo's own folder:
-    it cleans no folder it did not make, CACHEDIR.TAG). A mod's own
-    rustflags are ignored when packaging, its .cargo files otherwise
-    read: "hmmm well we had to acknowledge the fact that moda need a
-    special compilation, the reason for the packager, so i guess we
-    forbid those .cargo files? i guess its our only choice haha". Every dependency's library extracted,
-    each run, into target/civil_egregore_dependencies/ (cargo's deps/
-    differs per profile). Toolchain: never written by the packager; its
-    cargo runs pinned by RUSTUP_TOOLCHAIN from the game's file; a mod's
-    rust-toolchain.toml naming another refused; the template writes it.
-    Cargo.toml never written: the package's name and dylib checked by the
-    library being there after the build. INDIRECT DEPENDENCIES
-    (2026-10-26): dependencies/ may hold zips nobody lists, if a listed
-    one needs them ("yes thats allowed, its the same way the compiler
-    compiles libraries together anyways"), but none nothing needs; and
-    "if forest depends on oak it only makes sense meadow depending on
-    forest only can access oak on the downcasting stage since it will be
-    loaded by the time the downcasting can happen" -- --extern for every
-    dependency library of a side the mod may depend on, indirect ones too;
-    the manifest's references still reach only listed mods (through
-    containers). SOURCE FOR DEVELOPING, LIBRARIES FOR PACKAGING
-    (2026-10-26): "having the dependencies listed in a carfo fike is
-    developer support, the mod packager doesn't care that much about whats
-    kisted in that file" -- but a dependency in Cargo.toml is built from
-    source, another crate (TypeIds apart), so a mod's Cargo.toml lists the
-    game's crates and its dependency mods under
-    [target.'cfg(not(civil_egregore_packaging))'.dependencies] (path to
-    their source; how the developer has it is theirs), and the packager's
-    flags carry --cfg civil_egregore_packaging: cargo drops them, --extern
-    gives the compiled ones. Tried 2026-10-26 on copies of meadow and
-    basegame: packaging built meadow alone, loaded beside basegame's zip,
-    downcast GrassTick; a plain cargo check built protocol and basegame
-    from source and reported a typo against basegame's real GrassTick.
-    No tool does this for cargo (searched:
-    cargo has no prebuilt-dependency support, build scripts can't pass
-    --extern, the pre-RFC closed; the usual answer is a C ABI). "our
-    system is built to be source agnostic ... but practically all rust
-    development is source full" / "if a developer has the library but not
-    the source they are free to write their own plugging code" / "this is
-    the most were getting out of rust to have oue cake and eat it too".
-    Developing pulls protocol's crates.io dependencies into the mod's lock
-    file; packaging never. rust-analyzer itself not tried.
-  PRECEDENTS (searched 2026-10-26, "are we the only crazy people
-  compiling rust projects in this style"): ours is rustc's own pattern --
-  librustc_driver.so linked by clippy/rustdoc/miri, -Zcodegen-backend
-  loading a dylib built against it, one known export
-  (__rustc_codegen_backend); Fyrox 0.34 hot-reloads game dylibs built
-  against fyrox-dylib, same compiler; hot-lib-reloader (libloading).
-  Backed off: bevy_dynamic_plugin, deprecated as unsound (no check of the
-  same Bevy and rustc; doubts two compiles of one source agree). Ours
-  never compiles twice (--extern the one compile), pins the toolchain,
-  rustc refuses another compile's library (E0514/E0460), the hash pins
-  the bytes, symbols carry the compile's hash (a mismatch "undefined
-  symbol", not corruption). Left: Rust promises no layout even within a
-  version (-Zrandomize-layout and such), only if the game used them.
-  Others went to stabby/abi_stable, a C ABI, wasm, or processes --
-  each costs pure Rust or downcasting. Reading a world: each `depends
-    on` finds that version. The game's path written nowhere: the packager is the game's
-    and knows it.
-  - DEPENDENCIES CARRIED (the user, from Fabric's jar-in-jar: "we now
-    optionally provide the dependencies of a mod in a separate
-    dependencies/ folder inside the mod folder. if the dependency is
-    duplicated by its mod name it will be caught by the registry, and we
-    match by a version string on the mod manifest"): a mod's zip may hold
-    dependencies/, each a packaged zip byte for byte (its own hashes still
-    prove it). The premanifest says which ("premanifests is what
-    specifies if dependencies are packaged with the mod. it has to be
-    lol"), dependency by dependency: "a mod can carry some dependencies
-    and not others ... the only difference is on the premanifests,
-    whether we list the dependency on the "carried dependencies"or just
-    "depends on"" -- two lists of name : version pairs, a name in one
-    alone; the manifest's one `depends on` (name : version) holds both. Nesting any depth: "everything gets flattened to a list of
-    mods anyways. the only thing that changes is the recorded path of
-    the libraries to load them from". A name found twice: one kept if
-    the version and contents are the same, refused otherwise.
-  - EMPTY MODS ("basegame basically can be packaged as a single empty mod
-    carrying 2 dependencies lmao"): no library, no types, only depends
-    on; said so in the premanifest and manifest by a flag, `- container
-    mod` ("container mod likey likey"; flags are bare items in the
-    fields' list: "we dont need to make flags be pairs"), not inferred
-    -- a mod of a library and no types is another thing ("probably we want an optinal field in the pre manifest
-    to say "empty mod" right away instead of checking if there are any
-    bundles"). A type in the registry, and a side of its own: "a
-    container mod simply specifies a side to constrain its carried
-    dependencies to that side or common" -- a server container carries
-    server and common mods, a client one client and common; "container
-    common mods can carry anything, its the exception to the rule since
-    a container mod is a special case anyways" -- basegame's is common.
-    Depending on an empty mod reaches what it carries, through empty mods
-    only, filtered by the dependent's side: "we still want dependencies
-    to be able to just say basegame". basegame: basegame (empty, common)
-    carrying basegame_common, basegame_server, later basegame_client.
-  - sides: a mod with a library depends on mods its side sees (common on
-    common; server on common and server; client on common and client).
-    Loading: the flattened list, each mod by dependency then name, taken
-    or skipped by its own side.
-  - a type names types of its own mod or of mods it depends on (through
-    empty mods), never further.
-  THE READERS: protocol::manifest_format, the shared reader (the user:
-  "what we want is a shared library that takes cdnf's output and allows
-  to 2 other libraries to check if its a valid manifest or premanifest" /
-  "the shared part should be its own module"): CDNF's output to a plain
-  document, every check that does not depend on the form. The manifest's
-  own check in protocol::manifests (hash against the library); the
-  premanifest's in mod_packager ("i believe the dependency of
-  modpackager on protocol is justified"). Manifest's fields private
-  still: protocol alone makes one.
-  The packager, a binary of the game's (`cargo package_mod <mod folder>`
-  from the game; then from the mod by the alias it writes):
-  1. premanifest.cdnf read: every check one mod can make alone, before
-     anything is built; its own Premanifest type, no hashes.
-  2. The mod's .cargo/config.toml and rust-toolchain.toml generated
-     (machine's own, ignored by git): target folder, the game's flags,
-     --extern and -L for the game's libraries and each dependency's
-     (its manifest read first, with every check, hashes too), an alias;
-     the game's toolchain copied (the remote test's E0514). Then the
-     mod's workspace built.
-  3. Every set up function checked, no library opened: a generated .rs
-     in target/, compiled and linked by rustc against the built bundles
-     (--extern each, -L native), never run -- per function a
-     `const _: TypeSetUp = <crate>::<function>;` (there, its signature
-     right: E0308 otherwise) and a declaration in an `unsafe extern
-     "Rust"` block, all of them in a `#[used] static` (exported
-     #[no_mangle]: the linker's "undefined symbol" otherwise). Built as a
-     program, `fn main() {}` -- a program's names all resolved at link
-     on every OS, no flag: "as long as the only part of the code that
-     has to be os aware is the library loader im happy" (a cdylib
-     needed Linux's -z defs, refused). Without a use (no #[used], no
-     black_box) the missing export passed at every opt level.
-     A set up function must be reachable at its bundle crate's root --
-     defined there or `pub use`d there (E0425 otherwise, the packager
-     saying so); its export is under its bare name wherever it is
-     defined, a module or a helper crate (tried). "i still dont see a
-     reason to support nested bundles so this rule of "reachable from
-     root" is fine". Known gap, left: the export check proves the name
-     exported by some library on the link line, not by this bundle's
-     (a `pub use` of the common bundle's function from the server's):
-     the game then says "undefined symbol" at load, cleanly -- the
-     signature checked all the same. Written in
-     mod_packager/known_bugs.md: "annotate that on a "known bugs.md file
-     on the mod packager, that is important". Tried on basegame
-     2026-10-26: 0.3 s; a wrong signature and a mangled-only function
-     each refused so. "i have my doubts about how that automatically
-     generated rust file works, and how are we checking libraries
-     safely to check for no_mangle".
-  4. manifest.cdnf written by the writer, from the Premanifest and the
-     hashes, into the package folder beside the libraries.
-  5. The packaged mod read back by read_mods with its dependencies: the
-     game's own check, hashes and every check across mods ("the final
-     checks is of the packaged mod lol").
-  Parameters (a plane's width, a proc's planes) checked for validity
-  only: nothing in code declares them.
-  MODS SHIPPED AS ZIPS, KEPT AS ZIPS (2026-10-26): "distributing
-  mods/game as folders ia ahooting ourselves in the foot, we need to
-  distribute as packaging files like zip for example" / "yeah, kept as
-  is. in fact if we can avoid caching them at all the better, im willing
-  to extract them every time thats just server startup cost. if we can
-  avoid having to put them on disk at all even the betterer, maybe
-  loading straight from a buffer can work?" -- a world's mods/ holds the
-  zips; the manifest read and the hashes made from the archive's
-  entries (validation extracts nothing); at run, only the libraries that
-  load taken out, every start, no cache. DONE 2026-10-26:
-  protocol::packages (PackagePath: the zip on disk, then the zips inside
-  it); read_mods takes zips, flattens dependencies/<mod>.zip (each mod
-  before those it carries; a mod twice kept once if its manifest's text
-  is the same, refused otherwise; a stray entry refused); loading reads
-  the library out of the package again and opens it with
-  DynamicLibrary::from_bytes(mod_name, bytes). FROM_BYTES, A TEMPORARY
-  FILE ON EVERY OS: "A definitely, the loading library in utilities
-  should take care of the OS specific details" -- written to
-  <temp>/civil_egregore_libraries_<pid>/lib<mod>.so, opened, removed
-  (Linux keeps the mapping; Arch's /tmp is tmpfs). Windows can't remove a
-  loaded DLL, and mod libraries never close, so its files stay for the
-  system: "running multiple servers on a machine is definitely possible
-  and we dont want one server to go deletijg the other server temp files.
-  worst case a reboot cleans that up" -- no sweep of other processes'
-  folders. memfd (needs the libc crate) not taken. NO RE-HASH AT LOAD:
-  "dont worry about that lol, were not a security company, were making a
-  game". OUR OWN ZIP: "damn we need 12 crates to compress a folder into
-  an archive?" / "i mean, honestly, we only need to package things into
-  a zip, nothing else" / "yeah i think doing it this way ia simplest lol"
-  -- utilities::archive: stored entries alone, one date (1980-01-01), so
-  written the same every time; CRCs checked; compressed, encrypted,
-  multi-part, zip64, bad paths and twice-named entries refused. No zip
-  crate. Libraries carry a SONAME (lib<mod>.so): what lets a library
-  opened from anywhere satisfy its dependents' NEEDED.
-  THE LIBRARY HASH (2026-10-26): "hash library instead of having our
-  own please" / "the library hash doesnt have to be fast, but it
-  definitely has to be resistant" / "change hexadecimal prefix to 0x" --
-  SHA-256 (sha2, the third crate, at the root), used as it is -- "do we
-  need a specific library hash in protocol though? ... just make it a
-  civil egregore dependency": no type of ours, the manifest's hash text,
-  `0x` and the digest's own hex ({:x}), the same as sha256sum's. utilities::hash_bytes gone; the internal hashes left be
-  ("for now leave them be").
-  TEMPLATING: "this possibility makes templating as easy as calling
-  mod_packager new a la cargo style lol" -- the mod template made by the
-  packager, as `cargo new` makes a crate.
-  Kept from before: each type's set up named in the manifest (`set
-  up`), looked up in its mod's library by that name, bundle_set_up
-  gone ("B yeah, it matches everything tbh"); set up mod by mod,
-  dependencies first; required for kinds with code, optional for the
-  rest; setup functions #[unsafe(no_mangle)], unique in their library.
-  (Steps 1-5 above say bundle where it is now mod; the known gap stands:
-  a `pub use` of a dependency mod's set up function.)
-- SCA PROCS NAME THEIR PLANES (2026-10-25): "remember when i said that
-  sca rules are sample automatically, well we also need to say on what
-  planes are they sampled against HAHAHAHA,could be more than one btw" --
-  Kind::ScaProc { planes }, the manifest's `planes` list, one or more,
-  each a plane its bundle may name. And the proc's own call, once set
-  up, the server's trait: "we also pass the id of the plane the server
-  is sampling so the sca proc knows what is being sampled" -- the server
-  handle and the sampled plane's ID.
-- CDNF LISTS END ON A DOUBLE DASH (2026-10-25): "lets change the
-  newline rule of lists termination to double dash means last element,
-  simple as that" -- `--` at a line's start opens a list's last item, the
-  list ending after it (or where no dash follows); the triple newline
-  gone, any run of empty lines one blank line. The writer ("wait you're
-  going too fast ... i havent said a single thing about ita design"):
-  a typestate builder emitting tokens, everything given impl Display, no
-  Result; quoted only for quotes, colons, # and the like, or two newlines
-  in a row; newlines as the tokens joined need, none at all at times;
-  everything on a pair's right but a text indented; "make the end()
-  functions be end_list() style for better readability".
-- CSV GONE (2026-10-25): "delete csv from utilities and move cdnf there
-  lol" -- CDNF its own crate since 2026-10-26 ("cdnf basically has the
-  same status as tessera, a self contained project"): cdnf/, its rules
-  written in it in cdnf/cdnf.cdnf; the writer, typestate, quoting for
-  itself. Settings deleted 2026-10-26 ("delete settings lol"). The test
-  seed in transient_data/test_seed.cdnf. client -- render rule,
-  gui. Attributes: their size alone ("instead of "blocks" it should be
-  "size""), in 16-byte blocks, 1 to 256 ("yes, it should've been like
-  this from the beggining lol"), data words gone -- "atributes have a
-  fixed size btw, no variable size anymore. variably sized data will be
-  elsewhere later".
-- CDNF (the cdnf crate, 2026-10-25, its parser: "cdnf crate"): sections
-  -- a colon at a line's start, as many closing, deeper by one colon,
-  none skipped, a single colon not required and any number of them;
-  elements -- text bodies (contiguous text, ended by a blank line, a
-  dash, a section or a colon: "only double newline ia significant to end
-  a text body, a single line is part of it"), lists (dashes at a line's
-  start, blank lines between items allowed), pairs ("at the beggining of
-  line is a section / at the middle or end of line is a pair with
-  watever next element, there is no real distinction"; a b c is a (b c);
-  blank lines before the next element allowed; "- a :" then "- b" is "a
-  list inside a pair element inside a list"; "a triple newline terminates
-  a list always, thats the only list special case" -- the innermost
-  open, so a nested list ends and the one it is in goes on); quotes ("when a new
-  element is expected, we can either parse a quoted text, or something
-  else"), \" and \\ escaped; # comments; indentation means nothing; a
-  comment-only line is no line at all. A tokenizer, then the parser
-  ("i would make a tokenizer instead of going byte by byte"); one smoke
-  test ("we dont need too much testing").
-
-- ON HOLD with the server gone: basegame as a mod and step 3 below, as
-  written before the cleanup -- the plan's reasoning kept, its code
-  removed.
-- BASEGAME AS A MOD, the 0.7 milestone ("nvm its going to be 0.7", after
-  "probably the 0.8 milestone"), with the public API's freeze; what is left (asked 2026-10-24, "to remember lol"):
-  3.1's last two files; 3.2 the builder and kind traits (the design, the
-  entry point's shape); 3.3 basegame registering through it and split by
-  side into a library a bundle -- server (rules), client (render rules,
-  gui), common (worldgen calls); step 4 runtime loading (manifests, each
-  side opening its bundles after the freeze, basegame out of the
-  binaries' dependencies, the two binaries, src/main.rs gone, the root
-  tests into basegame's workspace); step 5 the mod packager and template
-  (built against the compiled game's target/). Step 6 not needed for it.
-- STEP 3 (the mod model in code, before runtime loading), co-op file by
-  file:
-  3.1 DONE (2026-10-24): simulation_time, plane_widths,
-      attribute_layouts, attributes (AttributeBlock, WholeAttribute,
-      of_block_array), entity (EntityBaseData, NEVER_WAKES) in
-      protocol::server_types, their tests in the server ("protocl is a
-      dependency of server after all"), no re-exports of them. Header
-      renamed EntityBaseData ("explicit names for stuff"), its fields
-      base_data; one NEVER_WAKES guard, in the wheel; FirstWake gone
-      (new_entity takes wakes_after: SimulationTime). Rule counts kept,
-      deprecated (LATER).
-  3.2 CLIENT CALLS FIRST, as a kind: "file 6 is actually a special one
-      ... server is just the provider of answers, client is the asker.
-      that sounds like protocol to me" / "the type registry is already
-      the hook manager ... i dont see why the type registry cant freeze
-      this too. there is always a limited set of client calls and server
-      responses" / "why do we have a worlds lifetime? why do we need those
-      specific context for calls? we already have 3 defined entrypoints
-      for everything, client server or protocol handles". So: no
-      CallContext -- a call's code gets the server's handle, as a rule
-      does; the world's calls frozen with its types (each call's mod and
-      code, cast once, sorted by ID, found by it; a client call whose
-      library is no call's code refuses the freeze -- completed as each
-      side opens its bundles once libraries load after the freeze);
-      ServerMessage::of_answer/into_answer for both ends of the wire.
-      KINDS IN ONE MODULE: "Ideally we want to centralize kinds into a
-      single kinds module lol" -- every kind's trait (client call, rule,
-      worldgen, render rule, gui) in one protocol module.
-      DONE (2026-10-24): protocol::kinds::server -- ClientCall (set up
-      once at world start through ServerSetUp, answering through the
-      BetweenTicks handle), WorldClientCalls; basegame's calls are it.
-      The client never holds a server handle: "what if client and server
-      are remote to each other". The server answers calls between ticks.
-      "Save as" removed: "save as is no longer needed under the new world
-      creation model" -- a world saves into its own folder; Save nameless.
-  3.2 the builder and the kind traits in protocol, one setup walk
-      matching frozen types to the structs added by name (replacing
-      rules_of, worldgen_of, RenderRules::of, the gui gathering).
-  3.3 basegame registering through the builder; its bundles listed in
-      code until manifests.
-- STEP 4: runtime loading -- manifests, libraries opened after the
-  freeze on their side; basegame out of the binaries' dependencies.
-- THE SERVER, FROM THE TAIL (2026-10-26), its first slice what basegame
-  asks: the loaded registry, a fixed set of hot superchunks, a bitmap a
-  plane, ticks sampling each sca proc's planes, calling it, applying its
-  compare-and-writes; no entities, warming, saving, network, worldgen
-  yet. Answers: (1) kind traits in the server crate, a game library (a
-  dylib) server mods get by --extern -- GAME_LIBRARIES side-aware
-  ("good"). (2) a set up returns the kind's trait object inside the
-  Export, the server downcasting to Box<dyn ScaProc>, dependents reaching
-  the concrete type by as_any: "a definitely, also because thinga like
-  worldgen kinds will have a different setup so a specific dyn kind is
-  the right shape". (3) a call gets the server handle, the sampled
-  plane's ID and a tile: "a cell is just a 1x1 tile so there is no
-  difference". (4) the compare-and-write builder's design back, "but not
-  exactly the same, we need to review the writes and compares we had
-  before considering that". (5) "let's see what we can get as we go, for
-  now we care it compiles haha".
-  THE TENTH QUEUE GOES (2026-10-26): "lets use grass spreading as a
-  simple example, lets imagine grass spreading means the old grass dies.
-  so a grass spreading across a superchunk has 2 compares and writes ...
-  if another grass spread to the target spreading cell then grass dies on
-  one side but never spread on the other, the old system simply made
-  those compares and writes sit in the 10 queue so no conflict ever
-  hapoened, but that was mostly a hack, the real problem is that we need
-  compares on multiple queues to die together. thata were atomic compares
-  come in" -- the design, brought back from exp-newserver's AI.txt
-  (cut from main's in the cleanup):
-  PHASE 2 ACROSS SUPERCHUNKS, the direction (2026-10-24, discussed, not
-  final): the 9 queues, each superchunk applying only its own cells, in
-  the one order; an act whose compares or writes span superchunks gated by
-  a counted atomic -- "we need to count up to the amount of compares tied
-  to the atomic, plus a bool that says if any failed so we abort
-  inmediatly" / "the expected number is not the number of superchunk, is
-  the expected numbers of compares that must succeed" / "at least 2 new
-  types of compare, compare and update atomic and compare atomic
-  (expected equals atmoc count, the last gate before writes are allowed
-  to proceed)" / "the server instruction translation from the perceived
-  single threaded public api compares and writes translates to the proper
-  atomic counter and flag instructions only where necessary (the public
-  compare and write api is oblivious to superchunk boundaries)". "yeah we
-  have to wait on the atomic bruv": a gate not yet met waits. Why compare
-  and write at all: "it is much cheaper to simply reject gated writes
-  later than preemptively checking if the write will be valid against all
-  previous writes". "the server is basically a vm for the Public api".
-  Atomics and skip tags: "for every skip tag there is an atomic (if
-  needed, a skip tag is not necessarily tied to an atomic, but an atomic
-  is always tied to a skip tag, this os to preserve instruction
-  execution/skip guarantees intact)". Compare and update atomic skips if
-  the atomic's fail bit is set, or if its own compare fails (setting it);
-  compare atomic "is just to enforce the wait, basically like a fence".
-  A superchunk may hold only compares of a set (a remote compare gating
-  local writes): "fair on point 1, compares without writes are valid in
-  this model".
-  A waiting superchunk parks and gives its thread back: "parked list is
-  fine yes, simper solution first, if blocking and polling is easiest
-  first go for it". Entity names stable for the tick: "the origin
-  positions are meant to be stable in tick ids for entities, so a
-  crossing entity to a new superchunk has its origin still on the
-  superchunk before moving. ideally every superchunk has a list of all
-  origin positions and the corrwsponding entity, and those origin
-  positions get updated to the current tick origin positions at the end
-  of phase 2 (literally the last thing done)" / "so even if an entity
-  comes from.another superchunk it still keeps the origin position in the
-  new suoerchunk for that tick".
-  Entities that crossed: "a chunk also keeps a list of entities that left
-  the chunk, and to which chunk index they went". So: every superchunk
-  keeps its entities by origin name and a departed list (name -> the
-  superchunk it went to); the superchunk left skips instructions naming a
-  departed entity; the superchunk arrived at, on taking part in the move,
-  looks the name up in phase 1's named-by-others list and slots those
-  authors' instructions, read from the left superchunk's outbox, into its
-  own order; an act naming another entity gets an atomic up front, as it
-  may be split across superchunks at run time (its expected count
-  unchanged). Moving is internal instructions: "we want instructions at
-  the internal level to move entities and trigger the deletion on one
-  superchunk and addition on the other. and also updating the
-  corresponding bookkeeping lists for origin positions vs current
-  position" -- "other than that id say record".
-  THE INSTRUCTION (2026-10-26): "at the moment we only need 2 public
-  instructions, a compare and a write, 24 bytes was chosen on purpose to
-  have 3x8 bytes, basically allows us to do a compare or write on 8 bytes
-  opcode + parameters, and up to 16 bytes of compare or write data" /
-  "hmmm well technically 3 counting skip tags". "yes compare as equality
-  is clearly the simplest". "why should handles be giving server
-  internals like an array index? even if read only, wat a proc sees and
-  talks with its typeids. not internal array indices". "what happens if
-  we had 2^56 planes? ... internally the index of an array number is a
-  usize right? maybe expanding instructions to 32 bytes could be the
-  right call haha". Settled, 32 bytes: word 0 the opcode (u8) and the
-  tile (u32, its corner cell, Morton within the superchunk); word 1 the
-  TypeId as the proc gave it; words 2-3 the data. Opcodes: compare
-  (equality), write, skip tag (public); atomic, fence (internal, the
-  lowering's, only around sets spanning superchunks). "B yeah i dont
-  really think instruction reading speed is going to be a bottleneck
-  haha, but worth measuring once we get there, the other way around
-  would be switching the instruction queue for 2 queues, one for
-  instructions and another for operands" -- measure 32 bytes against the
-  split queues with diagnostics, 0.9. "leta go with 32 bytes then".
-  THE SCA PROC TRAIT (2026-10-26): `trait ScaProc: Any + Send + Sync {
-  fn call(&self, server: &mut ServerHandle, sampled_plane: u64, tile:
-  CellIndex) }` in the server crate; the export a `Box<dyn ScaProc>`, the
-  server downcasting to it, mods past it to their own type by upcasting
-  to `&dyn Any` (no as_any). "yeah trait objects have to be, thats the
-  crux of the server interface, doing it any other way will probably
-  make things more complicated haha".
-  THE SERVER'S ORDER (2026-10-26, "the plan is good, but i think well
-  defer that a bit", the game packager first): 1 a superchunk's planes
-  (packed by width, Morton, by TypeId; read and write a tile); 2 the
-  applier, one superchunk, one thread (compare, skip to the skip tag,
-  write); 3 the builder, its tests real ticks; 4 several superchunks:
-  the lowering with atomic and fence, applied on ONE thread in global
-  author order -- the reference meaning of a tick, the grass across a
-  border its first test; 5 threads, parking at fences, checked equal to
-  4's run. Atomics plain counters until 5.
-  CHUNKS (2026-10-26): "lets rename superchunks to chunks, what we call
-  chunks today is the thing that needs a new name honestly" / "for now
-  lets do as if chunks didn't exist at all" -- the 1024 square is the
-  chunk; the 256 one gone from live code, named again if cold storage or
-  Tessera want it. reference/ and the exp branch left as they are.
-  HOT STORAGE (2026-10-26): per chunk, the planes with a tile not 0,
-  sorted by TypeId; each dense ("only sparse when we need it to be, ie
-  later"), packed by width, Morton, an exact count of tiles not 0 (what
-  sampling goes by); a plane emptied dropped at the tick's end. A tile is
-  its cells' place over its cells' count, no shift ("tiles are nicely
-  aligned and thats permanent"). The sampler: "lets just use the count
-  and loop over each value on a sampleable plane, completely wasteful,
-  incredibly simple". read_tile/write_tile wrap the plane's read and
-  write, finding (or making) the plane: "for now the wrappers are fine i
-  believe, if it makes the code more understandable"; writing to planes
-  directly later maybe.
-  THE SAMPLING RATE (2026-10-26): "the chance for a sampler is given by
-  the type as another piece of data attached to sca rules like the
-  sampled plane. the chance is specified as mean time per sample on
-  simulation seconds per sampleable cell, so a 1 would be roughly every
-  tile gets sampled by that rule every simulation second (a simulation
-  second is 256 ticks ...)" / "Basically the simulation second is
-  chanhed in code to 128, and everything else simply derices from it,
-  so we abstract ticks from the simulated time ie simulation second".
-  FLAT SKIP TAGS (2026-10-26): a compare that fails skips past the next
-  skip tag; tags unnumbered, no nesting, no run-ending instruction ("i
-  mean do we need to number skip tags at all? maybe not lol" / "yeah
-  this is the simpler design tbh, instructions become a little more
-  wasteful since we have to.suplicate compares, but its fine since we
-  want simplicity right now"). Many compares one tag is the point:
-  "having many compares one after another all leading to the same skip
-  tag is necessary to check larger pieces of data ... for entities is
-  another story". The atomic compare and fence stay internal, added at
-  step 4: "we need a processing step when inserting instructions to the
-  queue to insert those atomic compares anyways, so better to keep it
-  simple for now".
-  THE BUILDER (2026-10-26, step 3): "basically this is just another type
-  state construtor from the serverhandle in theory". The grass rule:
-  "a sampled grass has a chance of dying, and a slightly bigger chance
-  of spreading, this is rule internal code so it can be written like
-  watever".
-  A bad instruction while queuing (not a plane, too wide): "yeah panic
-  that mf". Reads beyond the hot: "trying to read a chunk while it's
-  warming is valid albeit impossible, or being at the edge of the world
-  2^31 chunks from the center is also valid and reading a neighbor there
-  would also be impossible. so those things should return 0s instead as
-  if the read tiles were 0/nonexistent plane in that chunk" -- then,
-  told the old server's way (a read of a chunk not hot NotHot, apart
-  from 0; a compare there does not hold, a write there missed): "i agree
-  on the old seever for this one, reada should fail on non hot chunks".
-  So a read is Result<u32, NotHot>: a plane not kept is Ok(0); a chunk
-  not hot, or past the world's edge, NotHot. Compares in a chunk not
-  hot fail. Procs: by TypeId, each over its hits in Morton order ("yes
-  simpler one").
-  A CHUNK'S RANDOM STREAM (2026-10-26): "there is one other thing chunks
-  must have tho. a seeded random stream, which is where each chunk gets
-  its random numbers from".
-  THE SERVER HANDLE (2026-10-26): "basically a reference to all chunks
-  (read only) plus the instructions queue references, 8 neighbor queues
-  and the current chunk queue, thats basically it in theory".
-- STEP 5 DONE (2026-10-26): the mod packager and the mod template;
-  basegame on it. `cargo package_mod new <folder> <side>`: the mod named
-  by its folder, one crate at the root, an empty [workspace], the game's
-  protocol by absolute path behind the packaging cfg, rust-toolchain.toml
-  of the game's channel, the premanifest (read back first: name, taken
-  names, side), .gitignore, empty dependencies/, a lib.rs of docs alone
-  ("empty, but with all the setup required"). "how do we specify the mod
-  path?" -- as packaging: the argument, relative to where it is run (the
-  game's folder, the alias there) or absolute.
-- STEP 6: per-world mods (mods/ copied at set up, basegame in or out).
-- Two binaries, client and server; src/main.rs removed; the root tests
-  into basegame's workspace ("probably move into basegame indeed").
-- ONE TRANSIENT DATA (2026-10-18): "a single unfified transient data
-  directory at the root, shared by everyone (they can have their own
-  folders inside if needed like the test saves folder)" -- the server's
-  tests still write server/transient_data/, basegame its own.
-- A lock on a world: world.lock at its folder's root, held while it is
-  open ("the lock file should be on the world folder root lol"); only
-  paging holds locks today. Pages kept inside the world folder.
-- "the client uses the same flags and parameters to start a server
-  lol": the window starts its server with --close_if_no_clients alone
-  and makes its world over the connection.
-- TYPES.CSV DRIVES LOADING: loading to walk types.csv, finding each
-  row's registration (today the game registers in its order, each type
-  taking its saved ID).
+NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
+- The order: 1 a chunk's planes (DONE: hot_chunk.rs, plane_shapes.rs);
+  2 the applier, one chunk, one thread (DONE: applier.rs); 3 the queuing
+  builder on the handle, tested with real ticks; 4 several chunks, the
+  lowering with atomic and fence, applied on ONE thread in global author
+  order (the reference meaning of a tick; grass across a border is its
+  first test); 5 threads, parking at fences, checked equal to 4's run.
+  Atomics stay plain counters until 5.
+- STEP 3, co-op file by file. Next: file 2, server_handle.rs -- reads
+  (read_tile, and at an offset, Result<u32, NotHot>), random_numbers(),
+  and the typestate set: set() -> compares -> writes/compares -> ended by
+  a skip tag, panicking on a bad plane or a value too wide. Then the
+  one-chunk tick: take the stream, sample, call procs by TypeId, give
+  the stream back, apply, drop empty planes. Test it with a grass proc
+  ("a sampled grass has a chance of dying, and a slightly bigger chance
+  of spreading") and a determinism check. Then basegame's grass_tick
+  does the same.
+- Not in the first slice: entities, warming, saving, network, worldgen,
+  the client.
 
 WAITING ON THE USER
 - Mask / word-of-cells instructions ("this will have to wait").
 - Entities of more than a cell ("later ... im gonna get into details").
-- Whether the whole-attribute compare (by sum) or the member compare is
-  set_attribute's default ("both are fine by me").
-- How tile planes are kept cold: raw, or bit-planes through Tessera.
-- Whether Around/Area/Window should be one shape.
-- Renaming protocol (hedged, not asked).
+- How planes are kept cold: raw, or bit-planes through Tessera.
+- Renaming protocol (hedged, never asked).
 
 OPEN, FOUND BY ME
-- TEST-ONLY MACHINERY: production never builds a between-ticks write
-  (WriteOp SetCell/ClearCell/FlipCell, WriteShape Rectangle/Disc, the
-  arena's write queue, the entity queue's Move/Edit/RemoveEntity,
-  add_entity/remove_entity/write_cells); only the server's tests do,
-  marked "only the crate's tests ask it yet". To the bones would set
-  those tests up through ticks and delete them -- not started.
-- ATOMICS ("im concerned about how much atomics we have"): most are the
-  applying phase's scheduler (tick/applying.rs, who_goes_on.rs,
-  following.rs); not a Mutex in their place: the applying phase
-  redesigned so its order needs no handshakes ("like the 2 tick
-  philosophy"). Arcs of read-only data as borrows ("the arcs as borrows
-  atracts me if they are read only stuff"): FrozenTypeRegistry,
-  DefaultAttributes, the dispatcher, paged images' paths -- one pass,
-  measured; the writeback ring's Arc<SuperchunkImage> moved to its
-  flush job and back -- its own step.
-- THE FLOCK DIES OUT on a long run (sheep past 150,000, grass to 0).
-  Cause not looked for.
-- The type registry made the tick ~9% slower (2026-10-16): suspects,
-  the default attribute looked up in a slice; TickCounts 16 rules wide.
-- A far view goes round slowly: the host copies every plane whole
-  whatever the detail level (16-bit planes 2 MB a superchunk); sending
-  planes at the detail level is the host's work to weigh.
-- Windows: engine_client.dll exports 36434 of Windows' 65535 symbols
-  with the game's Bevy features -- the way out, Bevy its own DLL.
-- A mod built against another commit of the same version loads (symbol
-  names come from -C metadata, not the source): the manifest's check, or
-  a build fingerprint, when there is something to version.
-- The window's server calls wait for the host on the main thread.
-- Simplification not yet read for: entity_manager, server, utilities,
-  chunk_storage, bitplane_manager.
-- Morton pathfinding: server/src/pathfinding/morton.rs, used by nothing,
-  tested equal to the rows' search; left: one-way walls for it, wire
-  into walking, measure both, the best wins.
+- A mod built against another build of the same game version loads (its
+  symbols come from -C metadata, not the source), and cargo doesn't
+  rebuild when an --extern library changes. Nothing checks that a mod
+  was built against this build; a stale mod misbehaves quietly. Record a
+  build fingerprint once there is something to version.
+- The mod packager's known gap: mod_packager/known_bugs.md.
 
 LATER (every "for later" of the user's, and mine, as said)
-- THE GAME FOLDER WIPED BY EVERY MOD PACKAGED (2026-10-26): the mod
-  packager runs the game packager, which lays target/civil_egregore/
-  out anew, so basegame.zip put there by `cargo distribute_game` is gone
-  after any `cargo package_mod`. "honestly, for now this is not an
-  issue, once the game gets bigger it may, not for now". My proposal
-  then: the game packager clears only what is not a zip.
-- REAL MOD DEVELOPERS (2026-10-26): "aight, if we ever had real mod
-  developers we will have to review this, for now it's fine to cut
-  corners for compatibility" -- the packager ignoring a mod's rustflags,
-  its own build folder. (Basegame packaged by hand in order: done,
-  2026-10-26, sources in the premanifest -- "id say, on the premanifest
-  we can optionally specify a second path for each dependency to its
-  source, and then the modpackager builds it and movea it into the
-  dependencies folder automatically" / "aight let it be A" -- the
-  version and the source a list paired with the dependency; kept a
-  field of their own inside, "lets keep it for now ... we can be more
-  sloppy with the packagers code since their functions are relatively
-  simple".)
-- SOURCES IN PACKAGES (my suggestion, 2026-10-26, not a plan): a
-  package optionally carrying its crate's source (Maven's -sources.jar),
-  the packager taking it out beside the libraries, so a dependency's zip
-  alone gives the editor its source; the author's choice, a premanifest
-  flag.
-- CDNF ELEMENTS KEEP THEIR LINE (2026-10-26, my opinion asked of the
-  format): the parsed elements carry no line, so a format or manifest
-  error names a section alone -- "that second point is about the code
-  lol, we can fix that indeed". Pairs merging over one line end stays,
-  on purpose: "about the first point: i dont think you understand the
-  reason. And this response is the reason, its parseable" -- a colon
-  then a paragraph over many lines is how people write; lists are for
-  fields ("that about pairs is exactly why we have the lists lol").
-- THE INTERNAL HASHES (2026-10-26): "our internal hashes are very bad
-  and artifact prone i have to note, they break the current determinism,
-  but changing the hash function doesn't break determinism just by
-  itself" -- utilities::hash's mix_word, slot, GOLDEN_RATIO (rng draws
-  with them, tessera's tables use them): any function the same on every
-  machine keeps a world following from its seed, so they may be
-  replaced; the worlds made before change, nothing more.
-- THE WINDOWS SYMBOL LIMIT (2026-10-26): "im also a tiny bit concerned
-  about the symbol limit on windows ngl, mainly for windows bevy builds
-  which already get close" / "when we get there we get there then". A
-  DLL exports 65,535 symbols at most (the format's, MSVC and GNU alike);
-  a Rust dylib exports nearly everything public, generics' instances
-  too. Bevy as one DLL is the risk, once the client is back: split it
-  into several wrapper dylibs, as cdnf sits inside utilities'; measure
-  first on Linux, `nm -D --defined-only | wc -l`.
-- THIRD-PARTY NOTICES (2026-10-26): "we have to kinda choose or make
-  some license or notice at least anyways at some point when we start
-  distributing the game" -- the repo has no license on purpose (all
-  rights reserved); Bevy, std, libloading need their license texts
-  shipped beside the game. cargo-about makes that file.
-- THE MOD TEMPLATE (2026-10-25): "thats exactly why were making a
-  mod_template crate. empty, but with all the setup required lol,
-  ideally the only setup is declaring the path of the game source
-  somewhere in cargo if possible, and all else is handled
-  automatically". And "remember mods depend on modpackager later btw".
-  Why: a mod outside the tree is out of reach of the game's
-  rust-toolchain.toml; on a rustup default of another version it fails
-  to build (E0514, "compiled by an incompatible version of rustc" -- the
-  foreign-machine test). Found: cargo 1.99 takes `include = [...]` in
-  .cargo/config.toml, stable, a path relative to that config file -- so
-  the template's config can be that one line, the game's path, and the
-  game's build write the file it includes (the flags, the --extern
-  libraries, -L). The toolchain no include sets: the mod packager,
-  built by the game's toolchain, building mods with it.
-- A mod built against another build of the game (mine, 2026-10-25): a
-  bundle library loads on a rebuilt libprotocol.so and its TypeIds
-  agree (the crate's metadata, not its source), but nothing checks it
-  was built against this one -- a stale mod misbehaves quietly. The mod
-  packager's: rebuild mods as the game changes, or record the game build
-  a mod was made against. Seen 2026-10-26: cargo does not watch a
-  library given by --extern, so `cargo build` in a mod after protocol
-  was rebuilt rebuilt nothing; `cargo clean -p <bundle>` first did.
-- How a client call -- a common kind, whose code gets no handle -- is
-  answered by the server: "let's leave the client call questions for
-  when we start working on the client again lol" (2026-10-25).
-- Variably sized data, out of attributes: "variably sized data will be
-  elsewhere later" (2026-10-25).
-- Positionless entities: "i actually have another plan for positionless
-  entities dont worry about it for now" (2026-10-24). Position stays an
-  entity's primary addressing ("entities primary addresing method is
-  their position indeed, keep it as is"); type and wake the obligatory
-  parts, NEVER_WAKES u64::MAX as it is ("is fine tbh, but 4 guards is a
-  lot lol").
-- Removing a mod from a world (its names stay in types.csv, nothing
-  registers them, the world refuses to load): "later we will add proper
-  mod removal, another day, that requires server side cleanup we just
-  font have yet, one step at a time lol" (2026-10-24).
-- The worldgen giving the server a land start point (seeds are drawn at
-  creation, so a world may start on ocean): "yes indeed, we need
-  worldgen to be able to give a land starting point to the server on
-  first run to load the very first hot superchunk at least".
-- The mod list built on mods/ in the gui between creating a world and
-  setting it up: "later we basically build the mod list on mods/ on the
-  gui between step 1 and 2".
-- The client handling a new world's mod config ("later we'll make the
-  client handle that better, basically well change how worlds
-  are.created entirely").
-- keep_hot on a running world with warmings in flight shortens them to
-  now, but their jobs timed entities from the original due tick: mine,
-  only tests do it.
-- Attributes up to 256 blocks of 16 bytes (4,096 bytes): "we need to
-  change max atribute size to 256 * 16 bytes. since we now use a single
-  byte for the size (on variably sized atributes, otherwise sized is
-  fixed and not stored on the atribute itself)" / "if its not done it
-  will be for later unless its easy to change" (2026-10-24). Today: 4
-  bits in every header (the ID << 4 | blocks - 1: ID masking, working
-  only as every kind is under 16), 16 blocks the most. The user's design:
-  "we want our types to be 56 bits + 8 bit kind, the size have to be the
-  following byte. we already deprecated typeid masking long ago, typeids
-  are typeids, they should not carry sizes" -- an attribute's first word
-  its whole ID, the byte after it its blocks less one; kept in every
-  attribute (my point, "1: fine": a list walked by its headers needs no
-  registry lookup a step). Open: the data then starts at byte 9, and
-  today a member lies in one word, words from byte 8. Mine also:
-  WholeAttribute, a stack buffer of the most blocks, would be 4 KB zeroed
-  on every default attribute read (every sheep wake): 16 blocks inline,
-  the heap past them, measured. The store is compact already (each
-  attribute its own blocks, the default without its type word, garbage
-  swept).
-- The tick API's raw-block entry points (set_attribute_blocks,
-  make_entity taking &[AttributeBlock]) typed and by type ID through the
-  store's builder ("the entity store api should abstract all of this");
-  attributes added and removed at run time, but the default one.
-- Reads that change frame to frame (render rules) or tick to tick
-  (server rules): "we probably keep it fixed now and add dynamicity on
-  that front later if needed".
-- Windows builds in the packagers: "good job, later we can fix windows
-  builds" (2026-10-23).
-- Debug builds in the packagers: "adding thebug build support later will
-  not be that hard" (2026-10-23).
-- Mod-defined hooks (one mod's extension point others plug into): "mod
-  hooks are the way, for waaay later indeed". No mod changes another's
-  code: "i dont see why mods would be touching anyone else compiled
-  libraries at runtime magically. however mods will be able to register
-  hooks later, when we need them" (2026-10-24).
-- MOD DEVELOPMENT EASE, a goal (the user, 2026-10-24): "i want a
-  relative ease of development for mods,.at least to the level of other
-  games, even if we start with a disadvantage with rust on that front
-  lol". Inspirations named: Factorio, Fabric, Satisfactory, Vintage
-  Story ("basegame as mods lol").
-- Mod support's edges, each "when we need them" (2026-10-24): versioning
-  and load safeguards, a mod's panic, a mod finding its own assets,
-  unloading a world's mods on the client, whose rule wins a contested
-  cell across mods.
-- Our CSV files in the user's own format: "csv format will eventually be
-  replaced with a custom format that i made years ago".
-- Doc comments thinned: "a lot of doc comments in the code now,
-  understandable for now, had to be fixed later".
-- The first shader, from scratch: "the shader for shadows and stuff, so
-  the terrain looks 3d again, we should do that one from scratch later".
-  Textures and texture packs later ("we dont need texture pack support
-  right now").
-- Content versions: a version or hash a bundle, for a client on another
-  machine: "dont worry about content versions now, that comes later".
-- Registry users cast down once: "users of the registry ideally cast
-  stuff down once if needed and never again, but thats for later lol".
-- Saving on shutdown (Ctrl-C, SIGTERM) for a headless server: "lets not
-  do save on shutdown for now, thats scope creep".
-- Several clients at once ("multi client support for later date");
-  multiplayer beyond loopback ("not a priority by a long shot"). They are
-  one thing: "having multiple client connections is how well have
-  multiñlayer in the future basically, for now only single client"
-  (2026-10-24) -- a call then may need to know which client asked.
-- A "hot" attribute on entities in place of the one hooked type ("some
-  entities will have the "hot", atribute later"; "sheep won't be the hot
-  entity for long").
+- THE GAME FOLDER WIPED BY EVERY MOD PACKAGED: package_mod runs the game
+  packager, which lays target/civil_egregore/ out anew, so basegame.zip
+  is gone. "honestly, for now this is not an issue, once the game gets
+  bigger it may". Mine: clear only what isn't a zip. And "later well
+  have mod packager call game packager instead for this, for now this
+  hack is fine".
+- REAL MOD DEVELOPERS: "if we ever had real mod developers we will have
+  to review this, for now it's fine to cut corners for compatibility" --
+  ignored rustflags, the packager's own build folder.
+- SOURCES IN PACKAGES (mine, not a plan): an optional crate source in a
+  package, for editors.
+- CDNF ELEMENTS KEEP THEIR LINE, so errors name a line: "we can fix that
+  indeed". Pairs running over many lines stay, on purpose ("its
+  parseable").
+- THE INTERNAL HASHES (utilities::hash, used by rng and tessera): "our
+  internal hashes are very bad and artifact prone ... changing the hash
+  function doesn't break determinism just by itself" / "for now leave
+  them be".
+- THE WINDOWS SYMBOL LIMIT (65,535 a DLL): "when we get there we get
+  there then". Bevy split into several dylibs if needed; count with
+  `nm -D --defined-only` first.
+- Windows builds and debug builds in the packagers ("later we can fix
+  windows builds"; "adding thebug build support later will not be that
+  hard").
+- THIRD-PARTY NOTICES: "we have to kinda choose or make some license or
+  notice at least anyways at some point when we start distributing the
+  game". The repo has no license on purpose.
+- Rename the local folder tilesim -> civil_egregore: "do the folder name
+  change later yes" -- at a session's end, my memory copied to the new
+  path first.
+- A panic=abort guard for mods (mine).
+- A mod derived from a macro: "we could conceivably make the macro buold
+  the manifest and registration function" -- moot with the premanifest,
+  kept in case.
+- Dynamic reads (frame to frame, tick to tick): "we probably keep it
+  fixed now and add dynamicity on that front later if needed".
+- Mod-defined hooks: "mod hooks are the way, for waaay later indeed".
+- Mod support's edges, each "when we need them": versioning safeguards,
+  a mod's panic, a mod's own assets, unloading on the client, contested
+  cells across mods. Mod removal from a world: "that requires server
+  side cleanup we just font have yet".
+- The worldgen giving the server a land start point: "we need worldgen
+  to be able to give a land starting point to the server on first run".
+- Several clients, multiplayer: "having multiple client connections is
+  how well have multiñlayer in the future basically, for now only single
+  client".
 - Simulation second as a server knob ("a prime candidate for a knob");
-  "remember simulation-second stuff, thats very important lol". The
-  client learns it from the server, never a constant of its own.
-- The climate, from scratch ("thats going to be redone from scratch");
-  grass spreads by itself meanwhile.
-- Rendering test runs again; the user has "a better idea for later".
-- Diagnostics, at 0.8/0.9: "disgnostics will come later at version
-  0.8/0.9"; their role to be set then ("diagnostics are changing roles
-  in the future", 2026-10-24).
-  Rule counts go with them: "ugh thats diagnostics, we need to remove
-  that lol" / "if leaving those tests and diagnostics as is is chesper
-  for now, leave them on server, dont move them.to protocol, mark that
-  file as deprecated" -- kept, in simulation_api/rule_counts.rs marked
-  DEPRECATED; out then with the counted writes, count places,
-  count_under, counted_when_applied, TickCounts and the rules' times,
-  RuleCode's count names, the tests that judge by counts observing
-  through the probe instead. Nothing new counts through them.
-- Tessera's deep clean.
-- Declined for now ("nah, there are other things to do"): fold
-  SetSkipTag into its first compare's spare bits (~4% back).
-- Crate docs, when resumed: simulation's still describe compare ends;
-  server's still describe camera flocks and sheep_per_flock.
-- Rules that sample entities as cells are sampled (maybe only dormant).
-- An area allocator: 256 MiB blocks, 256-byte units.
-- Optimizations and inlining; cold states paged; page-out on the
-  tick's thread.
-- Open question: libraries for any dependent type (not only rules).
+  the client learns it from the server.
+- Diagnostics at 0.8/0.9, their role set then.
+- The climate redone from scratch. The first shader from scratch.
+  Texture packs later. Tessera's deep clean.
+- Rules that sample entities as cells are sampled. An area allocator.
+  Optimizations, cold states paged.
+- MOD DEVELOPMENT EASE, a goal: "i want a relative ease of development
+  for mods,.at least to the level of other games"; tested with vscode
+  and rust-analyzer later.
