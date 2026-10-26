@@ -6,9 +6,9 @@
 //! the kind it must be; and no ring of guis nested in each other.
 
 use super::{Manifest, ManifestError};
-use crate::kinds::{Kind, Side};
-use crate::manifest_format::Type;
-use crate::type_names::TypeName;
+use crate::type_kinds::{Kind, Side};
+use crate::manifest_format::TypeDocument;
+use crate::type_names::QualifiedTypeName;
 use std::collections::HashMap;
 
 /// Every mod's manifest, by the mod's name.
@@ -48,22 +48,18 @@ fn may_carry(container: Side, carried: Side) -> bool {
     container == Side::Common || may_depend(container, carried)
 }
 
-/// Whether `manifest`'s mod is a container: no library.
-fn is_a_container(manifest: &Manifest) -> bool {
-    manifest.document.container
-}
-
 /// The mods `manifest`'s depends on there, each at the version said, of
 /// a side it may depend on, or carry if it is a container.
 fn check_dependencies(manifest: &Manifest, mods_by_name: &ModsByName) -> Result<(), ManifestError> {
-    for (dependency, version) in &manifest.document.depends_on {
+    for declared in &manifest.document.depends_on {
+        let (dependency, version) = (&declared.mod_name, &declared.version);
         let Some(depended) = mods_by_name.get(dependency.as_str()) else {
             return Err(refused(manifest, &manifest.document.name, format!("depends on {dependency}: no such mod")));
         };
         if depended.document.version != *version {
             return Err(refused(manifest, &manifest.document.name, format!("depends on {dependency} {version}: {dependency} is {}", depended.document.version)));
         }
-        let allowed = if is_a_container(manifest) { may_carry } else { may_depend };
+        let allowed = if manifest.document.is_container { may_carry } else { may_depend };
         if !allowed(manifest.document.side, depended.document.side) {
             return Err(refused(manifest, &manifest.document.name, format!("a mod of the {:?} side depends on {dependency}, of the {:?} side", manifest.document.side, depended.document.side)));
         }
@@ -78,13 +74,13 @@ fn reach_of<'mods>(manifest: &'mods Manifest, mods_by_name: &ModsByName<'mods>) 
     let mut reach = vec![manifest.document.name.as_str()];
     let mut containers_to_open = vec![manifest];
     while let Some(container) = containers_to_open.pop() {
-        for (dependency, _) in &container.document.depends_on {
-            let Some(&depended) = mods_by_name.get(dependency.as_str()) else { continue };
-            if reach.contains(&dependency.as_str()) || !may_depend(manifest.document.side, depended.document.side) {
+        for declared in &container.document.depends_on {
+            let Some(&depended) = mods_by_name.get(declared.mod_name.as_str()) else { continue };
+            if reach.contains(&declared.mod_name.as_str()) || !may_depend(manifest.document.side, depended.document.side) {
                 continue;
             }
             reach.push(&depended.document.name);
-            if is_a_container(depended) {
+            if depended.document.is_container {
                 containers_to_open.push(depended);
             }
         }
@@ -97,7 +93,7 @@ struct Reference<'kind> {
     /// The field naming it.
     field: &'static str,
     /// The type named.
-    named: &'kind TypeName,
+    named: &'kind QualifiedTypeName,
     /// Whether a kind is the one it must be.
     of_its_kind: fn(&Kind) -> bool,
     /// That kind's word.
@@ -106,7 +102,7 @@ struct Reference<'kind> {
 
 /// The types `kind` names: one field's, as many as it names.
 fn references(kind: &Kind) -> Vec<Reference<'_>> {
-    let (field, named, of_its_kind, kind_word): (_, Vec<&TypeName>, fn(&Kind) -> bool, _) = match kind {
+    let (field, named, of_its_kind, kind_word): (_, Vec<&QualifiedTypeName>, fn(&Kind) -> bool, _) = match kind {
         Kind::Entity { default_attribute: Some(attribute) } => ("default attribute", vec![attribute], |named| matches!(named, Kind::Attribute { .. }), "attribute"),
         Kind::EntityProc { entity } => ("entity", vec![entity], |named| matches!(named, Kind::Entity { .. }), "entity"),
         Kind::ScaProc { planes, .. } => ("planes", planes.iter().collect(), |named| matches!(named, Kind::Plane { .. }), "plane"),
@@ -117,14 +113,14 @@ fn references(kind: &Kind) -> Vec<Reference<'_>> {
 }
 
 /// The type `type_name` names, if its mod has it.
-fn type_named<'mods>(type_name: &TypeName, mods_by_name: &ModsByName<'mods>) -> Option<&'mods Type> {
+fn type_named<'mods>(type_name: &QualifiedTypeName, mods_by_name: &ModsByName<'mods>) -> Option<&'mods TypeDocument> {
     mods_by_name.get(type_name.mod_name.as_str())?.document.types.iter().find(|each_type| each_type.name() == type_name.type_name)
 }
 
 /// The types `named_by` names, if any: each of a mod in `reach`, there,
 /// and of the kind its field wants.
-fn check_references(manifest: &Manifest, named_by: &Type, reach: &[&str], mods_by_name: &ModsByName) -> Result<(), ManifestError> {
-    let section = TypeName { mod_name: manifest.document.name.clone(), type_name: named_by.name().to_string() }.to_string();
+fn check_references(manifest: &Manifest, named_by: &TypeDocument, reach: &[&str], mods_by_name: &ModsByName) -> Result<(), ManifestError> {
+    let section = QualifiedTypeName { mod_name: manifest.document.name.clone(), type_name: named_by.name().to_string() }.to_string();
     for Reference { field, named, of_its_kind, kind_word } in references(named_by.kind()) {
         if !reach.contains(&named.mod_name.as_str()) {
             return Err(refused(manifest, &section, format!("{field}: {named} is of a mod {} does not reach -- one it depends on, or one a container it depends on carries, of a side it may depend on", manifest.document.name)));
@@ -157,8 +153,8 @@ fn check_no_ring_of_dependencies(manifests: &[Manifest], mods_by_name: &ModsByNa
             None => {}
         }
         walks.insert(&manifest.document.name, Walk::OnThePath);
-        for (dependency, _) in &manifest.document.depends_on {
-            if let Some(in_the_ring) = walk(mods_by_name[dependency.as_str()], mods_by_name, walks) {
+        for declared in &manifest.document.depends_on {
+            if let Some(in_the_ring) = walk(mods_by_name[declared.mod_name.as_str()], mods_by_name, walks) {
                 return Some(in_the_ring);
             }
         }
@@ -180,7 +176,7 @@ fn check_no_ring_of_guis(manifests: &[Manifest], mods_by_name: &ModsByName) -> R
     for manifest in manifests {
         for gui in &manifest.document.types {
             let Kind::Gui { parent: mut next_parent } = gui.kind().clone() else { continue };
-            let gui_name = TypeName { mod_name: manifest.document.name.clone(), type_name: gui.name().to_string() };
+            let gui_name = QualifiedTypeName { mod_name: manifest.document.name.clone(), type_name: gui.name().to_string() };
             // A gui's parents are no more than the types there are; a ring
             // above it, not through it, is found from a gui of that ring.
             for _ in 0..=type_count {

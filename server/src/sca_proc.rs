@@ -9,8 +9,8 @@ use utilities::coordinates::CellIndex;
 
 /// A sca proc: called on every tile of the planes it is sampled on.
 pub trait ScaProc: Any + Send + Sync {
-    /// The tile whose corner cell is `tile`, of the plane of ID
-    /// `sampled_plane` -- one of those it is sampled on -- seen through
-    /// `server`.
-    fn call(&self, server: &mut ServerHandle, sampled_plane: u64, tile: CellIndex);
+    /// The tile whose corner cell is `tile_corner`, of the plane of type
+    /// ID `sampled_plane_type_id` -- one of those it is sampled on -- seen
+    /// through `server`.
+    fn call(&self, server: &mut ServerHandle, sampled_plane_type_id: u64, tile_corner: CellIndex);
 }

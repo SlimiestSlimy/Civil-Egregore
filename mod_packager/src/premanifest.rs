@@ -44,7 +44,7 @@ impl Premanifest {
     pub fn manifest(&self, hash: Option<String>) -> ModDocument {
         let mut manifest = self.document.clone();
         manifest.depends_on.append(&mut manifest.carried_dependencies);
-        manifest.sources.clear();
+        manifest.depends_on.iter_mut().for_each(|dependency| dependency.source = None);
         manifest.hash = hash;
         manifest
     }

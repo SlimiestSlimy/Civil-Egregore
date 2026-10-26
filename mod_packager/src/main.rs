@@ -53,7 +53,7 @@ fn package_the_mod(mod_folder: &std::path::Path, run: &mut sources::PackagingRun
     let dependencies = dependencies::read_dependencies(mod_folder, &premanifest)?;
     // A container's crate is none: nothing built, nothing to check.
     let mut library = None;
-    if !premanifest.document().container {
+    if !premanifest.document().is_container {
         building::package_the_game()?;
         let flags = building::packaging_flags(mod_folder, &premanifest, &dependencies)?;
         let built = building::build_the_mod(mod_folder, &premanifest, &flags)?;
@@ -62,6 +62,6 @@ fn package_the_mod(mod_folder: &std::path::Path, run: &mut sources::PackagingRun
     }
     let package = packaging::make_the_package(mod_folder, &premanifest, library.as_deref(), &dependencies)?;
     println!("{}: packaged, {}", premanifest.document().name, package.display());
-    run.packaged.push((mod_folder.clone(), package.clone()));
+    run.packaged.push(sources::PackagedMod { folder: mod_folder.clone(), package: package.clone() });
     Ok(package)
 }

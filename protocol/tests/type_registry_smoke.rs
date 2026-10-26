@@ -1,9 +1,9 @@
 //! A smoke test: three mods' manifests, a container among them carrying
 //! one, made into the registry's flat list.
 
-use protocol::kinds::{Kind, ModFields, Side};
+use protocol::type_kinds::{Dependency, Kind, ModFields, Side};
 use protocol::manifests::read_mods;
-use protocol::packages::{DEPENDENCIES_FOLDER, MANIFEST_FILE, PACKAGE_EXTENSION};
+use protocol::mod_packages::{DEPENDENCIES_FOLDER, MANIFEST_FILE, PACKAGE_EXTENSION};
 use protocol::type_registry::{TypeRegistry, KIND_SHIFT};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -37,7 +37,7 @@ fn mod_made(test_folder: &Path, mod_name: &str, library_bytes: Option<&[u8]>, ma
     written(test_folder, mod_name, &package_of(mod_name, library_bytes, manifest, &[]))
 }
 
-/// Every mod and type, in order, of its full name and of an ID counting
+/// Every mod and type, in order, of its qualified name and of an ID counting
 /// up whatever its kind, its kind's byte first.
 #[test]
 fn the_manifests_make_one_flat_list() {
@@ -52,7 +52,7 @@ fn the_manifests_make_one_flat_list() {
 grass :
 - kind : plane
 - width : 1
-- tile size : 1
+- tile scale : 0
 ");
     let other = package_of("other", Some(b"other bytes"), "\
 :other:
@@ -65,7 +65,7 @@ grass :
 water :
 - kind : plane
 - width : 4
-- tile size : 2
+- tile scale : 1
 ", &[]);
     let pack = written(&test_folder, "pack", &package_of("pack", None, "\
 :pack:
@@ -77,13 +77,13 @@ water :
     -- other : 3
 ", &[("other", other)]));
     let registry = TypeRegistry::of_manifests(&read_mods(&[base, pack]).expect("read and checked"));
-    let listed: Vec<(&str, u64)> = registry.types().iter().map(|registered| (registered.full_name(), registered.type_id())).collect();
+    let listed: Vec<(&str, u64)> = registry.types().iter().map(|registered| (registered.qualified_name(), registered.type_id())).collect();
     let id = |kind_byte: u64, number: u64| kind_byte << KIND_SHIFT | number;
     assert_eq!(listed, [("base", id(0x09, 0)), ("base>grass", id(0x01, 1)), ("pack", id(0x09, 2)), ("other", id(0x09, 3)), ("other>water", id(0x01, 4))]);
-    assert_eq!(registry.types()[4].kind(), &Kind::Plane { width_bits: 4, tile_size: 2 });
+    assert_eq!(registry.types()[4].kind(), &Kind::Plane { width_bits: 4, tile_scale: 1 });
     let Kind::Mod(ModFields { side, depends_on, .. }) = registry.types()[3].kind() else { panic!("a mod") };
-    assert_eq!((*side, &depends_on[..]), (Side::Common, &[("base".to_string(), "0.1".to_string())][..]));
-    let Kind::Mod(ModFields { library, .. }) = registry.types()[2].kind() else { panic!("a mod") };
-    assert!(library.is_none(), "a container's library is none");
+    assert_eq!((*side, &depends_on[..]), (Side::Common, &[Dependency { mod_name: "base".to_string(), version: "0.1".to_string() }][..]));
+    let Kind::Mod(ModFields { package, .. }) = registry.types()[2].kind() else { panic!("a mod") };
+    assert!(package.is_none(), "a container has no package to read a library from");
     _ = std::fs::remove_dir_all(&test_folder);
 }

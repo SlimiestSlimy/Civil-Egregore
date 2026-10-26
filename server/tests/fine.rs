@@ -6,9 +6,9 @@
 #[path = "../../utilities/test_seed.rs"]
 mod test_seed;
 
-#[path = "fine/applier.rs"]
-mod applier;
 #[path = "fine/hot_chunk.rs"]
 mod hot_chunk;
-#[path = "fine/sampling.rs"]
-mod sampling;
+#[path = "fine/plane_sampling.rs"]
+mod plane_sampling;
+#[path = "fine/queue_applier.rs"]
+mod queue_applier;

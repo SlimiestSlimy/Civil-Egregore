@@ -21,20 +21,20 @@ const CHECK_FOLDER: &str = "target/civil_egregore_set_up_check";
 /// `mod_folder` names, checked against its library `library`, built with
 /// `flags`: or why not.
 pub fn check_set_ups(mod_folder: &Path, premanifest: &Premanifest, library: &Path, flags: &[String]) -> Result<(), String> {
-    let mut set_ups: Vec<&str> = premanifest.document().types.iter().filter_map(|each_type| each_type.set_up()).collect();
+    let mut set_ups: Vec<&str> = premanifest.document().types.iter().filter_map(|each_type| each_type.set_up_function_name()).collect();
     set_ups.sort_unstable();
     set_ups.dedup();
     if set_ups.is_empty() {
         return Ok(());
     }
     let mod_name = &premanifest.document().name;
-    let mut source = String::from("// Made by the mod packager, each time it runs: a check, never run.\nuse protocol::type_registry::{Export, TypeRegistryHandle, TypeSetUp};\n\n");
+    let mut source = String::from("// Made by the mod packager, each time it runs: a check, never run.\nuse protocol::type_registry::{TypeCode, TypeRegistryHandle, TypeSetUp};\n\n");
     for set_up in &set_ups {
         source += &format!("const _: TypeSetUp = {mod_name}::{set_up};\n");
     }
     source += "\nunsafe extern \"Rust\" {\n";
     for set_up in &set_ups {
-        source += &format!("    safe fn {set_up}(registry: &TypeRegistryHandle<'_>) -> Result<Export, String>;\n");
+        source += &format!("    safe fn {set_up}(registry: &TypeRegistryHandle<'_>) -> Result<TypeCode, String>;\n");
     }
     source += &format!("}}\n\n#[used]\nstatic SET_UPS: [TypeSetUp; {}] = [{}];\n\nfn main() {{}}\n", set_ups.len(), set_ups.join(", "));
     let folder = mod_folder.join(CHECK_FOLDER);
@@ -51,7 +51,7 @@ pub fn check_set_ups(mod_folder: &Path, premanifest: &Premanifest, library: &Pat
         .map_err(|io_error| format!("rustc: {io_error}"))?;
     if !status.success() {
         return Err(format!(
-            "{mod_name}'s set up functions, as rustc said above: each one its premanifest names must be `pub`, at its crate's root, `#[unsafe(no_mangle)]`, and a `fn(&TypeRegistryHandle<'_>) -> Result<Export, String>` (checked by {})",
+            "{mod_name}'s set up functions, as rustc said above: each one its premanifest names must be `pub`, at its crate's root, `#[unsafe(no_mangle)]`, and a `fn(&TypeRegistryHandle<'_>) -> Result<TypeCode, String>` (checked by {})",
             file.display()
         ));
     }

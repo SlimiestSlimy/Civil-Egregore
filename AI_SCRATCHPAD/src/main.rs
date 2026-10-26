@@ -9,8 +9,8 @@
 //! `cargo run --release -p AI_SCRATCHPAD -- load <side> <package>...`:
 //! the mods read, registered and loaded for the side, every type listed.
 
-use protocol::kinds::Side;
-use protocol::type_names::TypeName;
+use protocol::type_kinds::Side;
+use protocol::type_names::QualifiedTypeName;
 use std::path::PathBuf;
 
 fn main() -> Result<(), String> {
@@ -43,8 +43,8 @@ fn main() -> Result<(), String> {
             println!("{} libraries loaded", loaded.library_count());
             for registered in loaded.registry().types() {
                 let code = loaded.code_of(registered.type_id()).map_or("no code".to_string(), |code| {
-                    if let Some(type_name) = code.downcast_ref::<TypeName>() {
-                        format!("code, downcast to a TypeName: {type_name}")
+                    if let Some(type_name) = code.downcast_ref::<QualifiedTypeName>() {
+                        format!("code, downcast to a QualifiedTypeName: {type_name}")
                     } else if let Some(sca_proc) = code.downcast_ref::<Box<dyn server::sca_proc::ScaProc>>() {
                         sca_proc.call(&mut server::server_handle::ServerHandle {}, 0, utilities::coordinates::CellIndex(0));
                         "code, downcast to a sca proc, called".to_string()
@@ -52,7 +52,7 @@ fn main() -> Result<(), String> {
                         "code of a type the probe does not know".to_string()
                     }
                 });
-                println!("{:016x} {} -- {code}", registered.type_id(), registered.full_name());
+                println!("{:016x} {} -- {code}", registered.type_id(), registered.qualified_name());
             }
         }
         _ => return Err("hash <file>, zip <archive> <file>..., unzip <archive>, or load <side> <package>...".to_string()),

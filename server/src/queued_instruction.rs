@@ -17,17 +17,17 @@ pub enum Opcode {
     SkipTag,
 }
 
-/// One instruction: the opcode and the tile in word 0, the type in word
-/// 1, the value in words 2 and 3.
+/// One instruction: the opcode and the tile's index in word 0, the
+/// plane's type ID in word 1, the value in words 2 and 3.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Instruction {
     /// What it does.
     opcode: Opcode,
-    /// The tile's corner cell: its place in the chunk, in Morton order.
-    tile: u32,
+    /// The tile's index: its corner cell's Morton index in the chunk.
+    tile_index: u32,
     /// The type ID of the plane, as the proc named it.
-    type_id: u64,
+    plane_type_id: u64,
     /// The value: a plane's, the low 32 bits of the first word.
     data: [u64; 2],
 }
@@ -35,21 +35,21 @@ pub struct Instruction {
 const _: () = assert!(size_of::<Instruction>() == 32);
 
 impl Instruction {
-    /// The plane of ID `plane` holds `value` at the tile holding the
-    /// cell at `place` in the chunk.
-    pub fn compare(plane: u64, place: u32, value: u32) -> Self {
-        Self { opcode: Opcode::Compare, tile: place, type_id: plane, data: [u64::from(value), 0] }
+    /// The plane of type ID `plane_type_id` holds `value` at the tile of
+    /// index `tile_index`.
+    pub fn compare(plane_type_id: u64, tile_index: u32, value: u32) -> Self {
+        Self { opcode: Opcode::Compare, tile_index, plane_type_id, data: [u64::from(value), 0] }
     }
 
-    /// The plane of ID `plane` made `value` at the tile holding the cell
-    /// at `place` in the chunk.
-    pub fn write(plane: u64, place: u32, value: u32) -> Self {
-        Self { opcode: Opcode::Write, tile: place, type_id: plane, data: [u64::from(value), 0] }
+    /// The plane of type ID `plane_type_id` made `value` at the tile of
+    /// index `tile_index`.
+    pub fn write(plane_type_id: u64, tile_index: u32, value: u32) -> Self {
+        Self { opcode: Opcode::Write, tile_index, plane_type_id, data: [u64::from(value), 0] }
     }
 
     /// A skip tag.
     pub fn skip_tag() -> Self {
-        Self { opcode: Opcode::SkipTag, tile: 0, type_id: 0, data: [0; 2] }
+        Self { opcode: Opcode::SkipTag, tile_index: 0, plane_type_id: 0, data: [0; 2] }
     }
 
     /// What it does.
@@ -57,18 +57,18 @@ impl Instruction {
         self.opcode
     }
 
-    /// The place in the chunk of its tile's corner cell.
-    pub(crate) fn place(&self) -> usize {
-        self.tile as usize
+    /// Its tile's index: its corner cell's Morton index in the chunk.
+    pub(crate) fn tile_index(&self) -> usize {
+        self.tile_index as usize
     }
 
     /// Its plane's type ID.
-    pub(crate) fn plane(&self) -> u64 {
-        self.type_id
+    pub(crate) fn plane_type_id(&self) -> u64 {
+        self.plane_type_id
     }
 
-    /// Its plane's value.
-    pub(crate) fn plane_value(&self) -> u32 {
+    /// Its value.
+    pub(crate) fn value(&self) -> u32 {
         self.data[0] as u32
     }
 }

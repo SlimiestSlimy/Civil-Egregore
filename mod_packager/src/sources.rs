@@ -7,7 +7,7 @@
 //! is a cycle, refused.
 
 use crate::premanifest::Premanifest;
-use protocol::packages::{DEPENDENCIES_FOLDER, PACKAGE_EXTENSION};
+use protocol::mod_packages::{DEPENDENCIES_FOLDER, PACKAGE_EXTENSION};
 use std::path::{Path, PathBuf};
 
 /// What one run of the packager has packaged, and is packaging.
@@ -15,22 +15,32 @@ use std::path::{Path, PathBuf};
 pub struct PackagingRun {
     /// The mods' folders being packaged, each waiting on the next.
     pub in_progress: Vec<PathBuf>,
-    /// The mods packaged: each its folder and its zip.
-    pub packaged: Vec<(PathBuf, PathBuf)>,
+    /// The mods packaged.
+    pub packaged: Vec<PackagedMod>,
+}
+
+/// A mod packaged in a run: its folder, and its zip.
+pub struct PackagedMod {
+    /// The mod's folder.
+    pub folder: PathBuf,
+    /// Its zip.
+    pub package: PathBuf,
 }
 
 /// The sourced dependencies of the mod in `mod_folder`, whose
 /// premanifest is `premanifest`, packaged in `run` -- or taken from it --
 /// and copied into its `dependencies/`: or why not.
 pub fn package_the_sources(mod_folder: &Path, premanifest: &Premanifest, run: &mut PackagingRun) -> Result<(), String> {
-    for (name, source) in &premanifest.document().sources {
+    let document = premanifest.document();
+    for dependency in document.depends_on.iter().chain(&document.carried_dependencies) {
+        let (name, Some(source)) = (&dependency.mod_name, &dependency.source) else { continue };
         let source_folder = mod_folder.join(source);
         let source_folder = source_folder.canonicalize().map_err(|io_error| format!("{name}'s source, {}: {io_error}", source_folder.display()))?;
         if run.in_progress.contains(&source_folder) {
             return Err(format!("{name}'s source, {}: being packaged already, a cycle", source_folder.display()));
         }
-        let package = match run.packaged.iter().find(|(folder, _)| *folder == source_folder) {
-            Some((_, package)) => package.clone(),
+        let package = match run.packaged.iter().find(|packaged| packaged.folder == source_folder) {
+            Some(packaged) => packaged.package.clone(),
             None => crate::package_the_mod(&source_folder, run)?,
         };
         if package.file_stem().and_then(|stem| stem.to_str()) != Some(name.as_str()) {

@@ -5,5 +5,5 @@
 grass :
 - kind : plane
 - width : 1
-- tile size : 1
+- tile scale : 0
 - set up : grass_set_up

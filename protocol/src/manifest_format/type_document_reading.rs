@@ -2,11 +2,11 @@
 //! sides and hooks.
 
 use super::field_list::FieldList;
-use super::{not_a_name, Type};
+use super::{not_a_name, TypeDocument};
 use cdnf::Element;
-use crate::kinds::{Hook, Kind, Side};
+use crate::type_kinds::{Hook, Kind, Side};
 use crate::simulation_time::SimulationSeconds;
-use crate::type_names::{is_a_name, TypeName, NAME_SEPARATOR};
+use crate::type_names::{is_a_name, QualifiedTypeName, NAME_SEPARATOR};
 
 /// Each side, and its word.
 const SIDE_WORDS: [(Side, &str); 3] = [(Side::Common, "common"), (Side::Server, "server"), (Side::Client, "client")];
@@ -17,8 +17,8 @@ const HOOK_WORDS: [(Hook, &str); 3] = [(Hook::GeneratesTheWorld, "generates the 
 /// The widths a plane's number may be, in bits.
 const PLANE_WIDTHS: [u32; 6] = [1, 2, 4, 8, 16, 32];
 
-/// The most cells a plane's tile has a side.
-const LARGEST_TILE: u32 = 256;
+/// The largest tile scale: tiles 2^8, 256, cells a side.
+const LARGEST_TILE_SCALE: u32 = 8;
 
 /// The largest attribute, in blocks.
 const LARGEST_ATTRIBUTE: u32 = 256;
@@ -34,7 +34,7 @@ pub(super) fn side_word(side: Side) -> &'static str {
 }
 
 /// The type named `type_name` in the mod `mod_name`, its fields `items`.
-pub(super) fn read_type(mod_name: &str, type_name: &str, items: &[Element]) -> Result<Type, String> {
+pub(super) fn read_type(mod_name: &str, type_name: &str, items: &[Element]) -> Result<TypeDocument, String> {
     if !is_a_name(type_name) {
         return Err(not_a_name(type_name));
     }
@@ -43,22 +43,22 @@ pub(super) fn read_type(mod_name: &str, type_name: &str, items: &[Element]) -> R
     let kind = match fields.text("kind")? {
         "plane" => {
             let width_bits = number_of(fields.text("width")?)?;
-            let tile_size = number_of(fields.text("tile size")?)?;
+            let tile_scale = number_of(fields.text("tile scale")?)?;
             if !PLANE_WIDTHS.contains(&width_bits) {
                 return Err(format!("width: one of {PLANE_WIDTHS:?} bits, not {width_bits}"));
             }
-            if !tile_size.is_power_of_two() || tile_size > LARGEST_TILE {
-                return Err(format!("tile size: a power of two, 1 to {LARGEST_TILE}, not {tile_size}"));
+            if tile_scale > LARGEST_TILE_SCALE {
+                return Err(format!("tile scale: 0 to {LARGEST_TILE_SCALE}, tiles 2^scale cells a side, not {tile_scale}"));
             }
-            Kind::Plane { width_bits, tile_size }
+            Kind::Plane { width_bits, tile_scale }
         }
         "entity" => Kind::Entity { default_attribute: fields.optional_text("default attribute")?.map(reference).transpose()? },
         "attribute" => {
-            let size = number_of(fields.text("size")?)?;
-            if !(1..=LARGEST_ATTRIBUTE).contains(&size) {
-                return Err(format!("size: 1 to {LARGEST_ATTRIBUTE} blocks, not {size}"));
+            let size_in_blocks = number_of(fields.text("size")?)?;
+            if !(1..=LARGEST_ATTRIBUTE).contains(&size_in_blocks) {
+                return Err(format!("size: 1 to {LARGEST_ATTRIBUTE} blocks, not {size_in_blocks}"));
             }
-            Kind::Attribute { size }
+            Kind::Attribute { size_in_blocks }
         }
         "entity proc" => Kind::EntityProc { entity: reference(fields.text("entity")?)? },
         "sca proc" => {
@@ -100,11 +100,11 @@ pub(super) fn read_type(mod_name: &str, type_name: &str, items: &[Element]) -> R
     let set_up = fields.optional_text("set up")?;
     match set_up {
         Some(function_name) if !is_a_function_name(function_name) => return Err(format!("set up: `{function_name}` is no function's name: a letter or _ first, then letters, 0-9 and _")),
-        None if kind.has_code() => return Err(format!("set up: missing, a {}'s code its function's to make", kind_word(&kind))),
+        None if kind.has_code() => return Err(format!("set up: missing, {}'s code its function's to make", kind_with_article(&kind))),
         _ => {}
     }
-    fields.none_left(&format!("a {}", kind_word(&kind)))?;
-    Ok(Type { name: type_name.to_string(), kind, hooks, set_up: set_up.map(str::to_string) })
+    fields.none_left(&kind_with_article(&kind))?;
+    Ok(TypeDocument { name: type_name.to_string(), kind, hooks, set_up_function_name: set_up.map(str::to_string) })
 }
 
 /// Whether `text` is a function's name as Rust exports it unmangled: a
@@ -114,9 +114,9 @@ fn is_a_function_name(text: &str) -> bool {
     characters.next().is_some_and(|first| first.is_ascii_alphabetic() || first == '_') && characters.all(|each| each.is_ascii_alphanumeric() || each == '_')
 }
 
-/// The type `text` names, from the mod `mod_name` ([`TypeName::read`]).
-fn type_name_of(mod_name: &str, text: &str) -> Result<TypeName, String> {
-    TypeName::read(mod_name, text).ok_or_else(|| format!("`{text}` names no type: its name, or its mod's, {NAME_SEPARATOR} and its own"))
+/// The type `text` names, from the mod `mod_name` ([`QualifiedTypeName::read`]).
+fn type_name_of(mod_name: &str, text: &str) -> Result<QualifiedTypeName, String> {
+    QualifiedTypeName::read(mod_name, text).ok_or_else(|| format!("`{text}` names no type: its name, or its mod's, {NAME_SEPARATOR} and its own"))
 }
 
 /// The number `text` is.
@@ -153,6 +153,13 @@ pub(super) fn kind_word(kind: &Kind) -> &'static str {
         Kind::RenderProc { .. } => "render proc",
         Kind::Gui { .. } => "gui",
     }
+}
+
+/// A kind's word after its article, as it is said: `an entity`, `a plane`.
+pub(super) fn kind_with_article(kind: &Kind) -> String {
+    let word = kind_word(kind);
+    let article = if word.starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" };
+    format!("{article} {word}")
 }
 
 /// The side a type of `kind` is in a mod of.

@@ -6,8 +6,9 @@
 //! every library in them written to one folder rustc finds them in.
 
 use crate::premanifest::Premanifest;
+use protocol::manifest_format::DeclaredDependency;
 use protocol::manifests::{read_mods, Manifest};
-use protocol::packages::{DEPENDENCIES_FOLDER, PACKAGE_EXTENSION};
+use protocol::mod_packages::{DEPENDENCIES_FOLDER, PACKAGE_EXTENSION};
 use std::path::{Path, PathBuf};
 use utilities::dynamic_library::library_file_name;
 
@@ -28,22 +29,22 @@ pub struct Dependencies {
 /// [`EXTRACTED_FOLDER`]: or what is wrong.
 pub fn read_dependencies(mod_folder: &Path, premanifest: &Premanifest) -> Result<Dependencies, String> {
     let folder = mod_folder.join(DEPENDENCIES_FOLDER);
-    let mut named_packages: Vec<(String, PathBuf)> = Vec::new();
+    let mut named_packages: Vec<NamedPackage> = Vec::new();
     if folder.exists() {
         for entry in std::fs::read_dir(&folder).map_err(|io_error| format!("{}: {io_error}", folder.display()))? {
             let path = entry.map_err(|io_error| format!("{}: {io_error}", folder.display()))?.path();
             let name = path.file_name().and_then(|file_name| file_name.to_str()?.strip_suffix(PACKAGE_EXTENSION));
             match name {
-                Some(name) if path.is_file() => named_packages.push((name.to_string(), path.clone())),
+                Some(name) if path.is_file() => named_packages.push(NamedPackage { mod_name: name.to_string(), package: path.clone() }),
                 _ => return Err(format!("{}: a dependency's zip alone may be there", path.display())),
             }
         }
     }
-    named_packages.sort();
-    let packages: Vec<PathBuf> = named_packages.iter().map(|(_, path)| path.clone()).collect();
+    named_packages.sort_by(|one, other| one.mod_name.cmp(&other.mod_name));
+    let packages: Vec<PathBuf> = named_packages.iter().map(|named| named.package.clone()).collect();
     let manifests = read_mods(&packages).map_err(|refusal| refusal.to_string())?;
-    let listed: Vec<&(String, String)> = premanifest.document().depends_on.iter().chain(&premanifest.document().carried_dependencies).collect();
-    for (name, version) in &listed {
+    let listed: Vec<&DeclaredDependency> = premanifest.document().depends_on.iter().chain(&premanifest.document().carried_dependencies).collect();
+    for DeclaredDependency { mod_name: name, version, .. } in listed.iter().copied() {
         let Some(manifest) = manifests.iter().find(|manifest| manifest.document().name == *name) else {
             return Err(format!("depends on {name}: no {DEPENDENCIES_FOLDER}{name}{PACKAGE_EXTENSION}"));
         };
@@ -52,7 +53,7 @@ pub fn read_dependencies(mod_folder: &Path, premanifest: &Premanifest) -> Result
         }
     }
     let needed = needed_by(&listed, &manifests);
-    for (name, package) in &named_packages {
+    for NamedPackage { mod_name: name, package } in &named_packages {
         // Its own mod read as another's, if the same mod was read before it: none then.
         let read_as = manifests.iter().find(|manifest| manifest.package().file == *package && manifest.package().nested.is_empty());
         if read_as.is_some_and(|manifest| manifest.document().name != *name) || !needed.contains(&name.as_str()) {
@@ -63,17 +64,25 @@ pub fn read_dependencies(mod_folder: &Path, premanifest: &Premanifest) -> Result
     Ok(Dependencies { packages, manifests })
 }
 
+/// A zip in a mod's `dependencies/`, and the mod it is named for.
+struct NamedPackage {
+    /// The mod's name: the zip's, without its extension.
+    mod_name: String,
+    /// The zip.
+    package: PathBuf,
+}
+
 /// The names of the mods `listed` and of every mod they depend on in
 /// turn, among `manifests`.
-fn needed_by<'mods>(listed: &[&'mods (String, String)], manifests: &'mods [Manifest]) -> Vec<&'mods str> {
-    let mut needed: Vec<&str> = listed.iter().map(|(name, _)| name.as_str()).collect();
+fn needed_by<'mods>(listed: &[&'mods DeclaredDependency], manifests: &'mods [Manifest]) -> Vec<&'mods str> {
+    let mut needed: Vec<&str> = listed.iter().map(|declared| declared.mod_name.as_str()).collect();
     let mut next = 0;
     while let Some(&name) = needed.get(next) {
         next += 1;
         for manifest in manifests.iter().filter(|manifest| manifest.document().name == name) {
-            for (dependency, _) in &manifest.document().depends_on {
-                if !needed.contains(&dependency.as_str()) {
-                    needed.push(dependency);
+            for declared in &manifest.document().depends_on {
+                if !needed.contains(&declared.mod_name.as_str()) {
+                    needed.push(&declared.mod_name);
                 }
             }
         }
@@ -87,7 +96,7 @@ fn extract_libraries(folder: &Path, manifests: &[Manifest]) -> Result<(), String
         std::fs::remove_dir_all(folder).map_err(|io_error| format!("{}: {io_error}", folder.display()))?;
     }
     std::fs::create_dir_all(folder).map_err(|io_error| format!("{}: {io_error}", folder.display()))?;
-    for manifest in manifests.iter().filter(|manifest| !manifest.document().container) {
+    for manifest in manifests.iter().filter(|manifest| !manifest.document().is_container) {
         let library_file = library_file_name(&manifest.document().name);
         let library_bytes = manifest.package().read_entry(&library_file)?;
         std::fs::write(folder.join(&library_file), library_bytes).map_err(|io_error| format!("{}: {io_error}", folder.join(&library_file).display()))?;

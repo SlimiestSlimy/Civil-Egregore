@@ -9,7 +9,7 @@ use crate::building::game_libraries;
 use crate::premanifest::PREMANIFEST_FILE;
 use cdnf::writer::CdnfWriter;
 use protocol::manifest_format::{read_mod_document, FormatError};
-use protocol::packages::DEPENDENCIES_FOLDER;
+use protocol::mod_packages::DEPENDENCIES_FOLDER;
 use std::path::Path;
 
 /// A new mod's lib.rs.
@@ -20,12 +20,12 @@ const LIBRARY_SOURCE: &str = "//! A mod of Civil Egregore's.
 //!
 //! ```ignore
 //! #[unsafe(no_mangle)]
-//! pub fn example_set_up(registry: &TypeRegistryHandle<'_>) -> Result<Export, String> {
+//! pub fn example_set_up(registry: &TypeRegistryHandle<'_>) -> Result<TypeCode, String> {
 //!     ...
 //! }
 //! ```
 //!
-//! (`protocol::type_registry::{Export, TypeRegistryHandle}`). What it
+//! (`protocol::type_registry::{TypeCode, TypeRegistryHandle}`). What it
 //! returns is what the game, and the mods depending on this one, get of
 //! the type. Packaged by `cargo package_mod <this folder>`, from the
 //! game's folder.

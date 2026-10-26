@@ -103,7 +103,7 @@ PRINCIPLES
 MODS (how and why in memory: mods-why-one-crate,
 mods-built-against-the-compiled-game)
 - A mod is one crate and one library (or none, for a container), with
-  one side (common, server, client). Full names are `mod>type`, made
+  one side (common, server, client). Qualified names are `mod>type`, made
   only of A-Z a-z 0-9 _. A mod depends on its own side or common; "a
   container mod simply specifies a side to constrain its carried
   dependencies", and a common container may carry anything.
@@ -113,13 +113,15 @@ mods-built-against-the-compiled-game)
   dependencies/, with versions on both sides.
 - THE CHAIN: CDNF, then protocol::manifest_format (the shared reader),
   then manifests (checks of one mod, then across mods), then the type
-  registry (a flat list: IDs, full names, no checks). Then loading:
+  registry (a flat list: IDs, qualified names, no checks). Then loading:
   libraries out of the zips, set up mod by mod, dependencies first. Each
   type's `set up` is #[unsafe(no_mangle)], named in the manifest.
 - Kinds: common -- plane, attribute, client call; server -- entity,
   entity proc, sca proc, worldgen; client -- render proc, gui. An entity
   proc names its entity. A sca proc names its `planes` (one or more) and
-  its `seconds per sample`.
+  its `seconds per sample`. A plane says its `width` (1 to 32 bits) and
+  its `tile scale`, 0 to 8: tiles 2^n cells a side ("1 yes, 0-8 and
+  2^n").
 
 THE SERVER (0.8; design in force)
 - CHUNKS: a chunk is 1024x1024 cells (formerly the "superchunk"; "lets
@@ -140,8 +142,9 @@ THE SERVER (0.8; design in force)
   1 second at 256 ticks a second is 1/256). "the simulation second is
   chanhed in code to 128, and everything else simply derices from it" --
   protocol::simulation_time. Hits are Morton cell indices.
-- THE INSTRUCTION: 32 bytes -- the opcode (u8) and the tile (u32, its
-  place in the chunk), the TypeId (u64), and the data ([u64; 2]). Public
+- THE INSTRUCTION: 32 bytes -- the opcode (u8) and the tile index (u32,
+  its corner cell's Morton index in the chunk: "tile index (for morton
+  index)"), the plane's type ID (u64), and the data ([u64; 2]). Public
   opcodes: compare (equality), write, skip tag. Internal ones, added at
   step 4 by a processing step at queue time: atomic and fence. "leta go
   with 32 bytes then"; measure it against split queues at 0.9.
@@ -152,8 +155,8 @@ THE SERVER (0.8; design in force)
   necessary to check larger pieces of data". HARD RULE: every write is
   under a compare, in every queue (memory: atomic-compare-and-writes).
 - THE SCA PROC: `trait ScaProc: Any + Send + Sync { fn call(&self,
-  server: &mut ServerHandle, sampled_plane: u64, tile: CellIndex) }`.
-  The export is a Box<dyn ScaProc>; mods reach their own type by
+  server: &mut ServerHandle, sampled_plane_type_id: u64, tile_corner:
+  CellIndex) }`. Its set up's TypeCode is a Box<dyn ScaProc>; mods reach their own type by
   upcasting to &dyn Any. "trait objects have to be, thats the crux of
   the server interface". Procs run by TypeId, each over its hits in
   Morton order.
@@ -188,7 +191,7 @@ THE SERVER (0.8; design in force)
 
 NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
 - The order: 1 a chunk's planes (DONE: hot_chunk.rs, plane_shapes.rs);
-  2 the applier, one chunk, one thread (DONE: applier.rs); 3 the queuing
+  2 the applier, one chunk, one thread (DONE: queue_applier.rs); 3 the queuing
   builder on the handle, tested with real ticks; 4 several chunks, the
   lowering with atomic and fence, applied on ONE thread in global author
   order (the reference meaning of a tick; grass across a border is its
@@ -219,6 +222,15 @@ OPEN, FOUND BY ME
   was built against this build; a stale mod misbehaves quietly. Record a
   build fingerprint once there is something to version.
 - The mod packager's known gap: mod_packager/known_bugs.md.
+- A KIND'S CODE BOXED TWICE (review, 2026-10-26): a sca proc's set up
+  makes a Box<dyn ScaProc> inside the Box<dyn Any> of its TypeCode, got
+  back with downcast_ref::<Box<dyn ScaProc>>(). Every kind with a trait
+  (entity procs, worldgen) would repeat it: decide the pattern once,
+  before they come.
+- A PLANE'S WIDTH TRUSTED AS A u32 (review, 2026-10-26): the manifest
+  refuses widths but 1, 2, 4, 8, 16, 32, and everything after holds a
+  plain number. An enum of the six would make a bad width impossible to
+  hold; small, not urgent, the manifest being the one way in.
 
 LATER (every "for later" of the user's, and mine, as said)
 - THE GAME FOLDER WIPED BY EVERY MOD PACKAGED: package_mod runs the game
@@ -258,6 +270,15 @@ LATER (every "for later" of the user's, and mine, as said)
 - Dynamic reads (frame to frame, tick to tick): "we probably keep it
   fixed now and add dynamicity on that front later if needed".
 - Mod-defined hooks: "mod hooks are the way, for waaay later indeed".
+- SAMPLING'S COST, from the review (2026-10-26), "fair, for another
+  day": corners_of_non_zero_tiles reads every tile of a plane and
+  sample_plane draws once a tile not 0 -- a 1-bit plane full of grass,
+  a million of each a chunk a tick. Deliberate ("completely wasteful,
+  incredibly simple"); the tick probe's first look.
+- ONE ERROR TYPE FOR LOADING, from the review, "fair, for another day":
+  manifests refuse with a ManifestError (package, line, section), the
+  loading with a String; a load error naming the type and its library
+  matters once there are several mods.
 - Mod support's edges, each "when we need them": versioning safeguards,
   a mod's panic, a mod's own assets, unloading on the client, contested
   cells across mods. Mod removal from a world: "that requires server

@@ -9,7 +9,7 @@
 
 use crate::dependencies::{Dependencies, EXTRACTED_FOLDER};
 use crate::premanifest::Premanifest;
-use protocol::kinds::Side;
+use protocol::type_kinds::Side;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use utilities::dynamic_library::library_file_name;
@@ -61,7 +61,7 @@ pub fn packaging_flags(mod_folder: &Path, premanifest: &Premanifest, dependencie
         flags.extend(["--extern".to_string(), format!("{name}={}", game_folder.join(library_file_name(name)).display())]);
     }
     // A mod uses what its side may depend on: indirect dependencies too, loaded before it all the same.
-    for manifest in dependencies.manifests.iter().filter(|manifest| !manifest.document().container) {
+    for manifest in dependencies.manifests.iter().filter(|manifest| !manifest.document().is_container) {
         if manifest.document().side == Side::Common || manifest.document().side == premanifest.document().side {
             flags.extend(["--extern".to_string(), format!("{}={}", manifest.document().name, extracted.join(library_file_name(&manifest.document().name)).display())]);
         }
