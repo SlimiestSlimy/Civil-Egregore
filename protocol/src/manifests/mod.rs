@@ -82,8 +82,8 @@ impl Bundle {
     }
 }
 
-/// A type: its name -- no other type's in its bundle -- its kind, and
-/// its hooks, each one its kind takes.
+/// A type: its name -- no other type's in its bundle -- its kind, its
+/// hooks, each one its kind takes, and its set up function's name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Type {
     /// Its name, in its bundle.
@@ -92,6 +92,9 @@ pub struct Type {
     kind: Kind,
     /// Its hooks.
     hooks: Vec<Hook>,
+    /// The name its bundle's library exports its set up function as: one
+    /// a type of a kind with code has, any other may.
+    set_up: Option<String>,
 }
 
 impl Type {
@@ -108,6 +111,11 @@ impl Type {
     /// Its hooks.
     pub fn hooks(&self) -> &[Hook] {
         &self.hooks
+    }
+
+    /// The name its set up function is exported as, if it has one.
+    pub fn set_up(&self) -> Option<&str> {
+        self.set_up.as_deref()
     }
 }
 

@@ -65,8 +65,12 @@ pub enum Kind {
         /// The type of entity it runs on: an entity.
         entity: TypeName,
     },
-    /// A proc of the stochastic cell automaton: of the cells.
-    ScaProc,
+    /// A proc of the stochastic cell automaton: run on the cells sampled
+    /// of the planes it names.
+    ScaProc {
+        /// The planes it is sampled on: one or more, each a plane.
+        planes: Vec<TypeName>,
+    },
     /// A way of generating a world.
     Worldgen,
     /// A function a client may call across the connection.
@@ -81,6 +85,14 @@ pub enum Kind {
         /// The window it is nested in, if any: a gui.
         parent: Option<TypeName>,
     },
+}
+
+impl Kind {
+    /// Whether a type of it has code, its set up function's to make: a
+    /// proc's, a worldgen's, a gui's.
+    pub fn has_code(&self) -> bool {
+        matches!(self, Kind::EntityProc { .. } | Kind::ScaProc { .. } | Kind::Worldgen | Kind::RenderProc { .. } | Kind::Gui { .. })
+    }
 }
 
 /// What a type is hooked into, each taken by one kind alone.

@@ -44,8 +44,7 @@ grass :
 - library : libother.so
 - hash : {hash}
 - depends on :
-- base>planes
-
+    -- base>planes
 
 water :
 - kind : plane

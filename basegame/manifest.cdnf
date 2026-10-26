@@ -3,20 +3,23 @@
 ::common::
 - side : common
 - library : ../target/release/libbasegame_common.so
-- hash : f947fc8eabbb2931
+- hash : a583244fed746cdd
 
 grass :
 - kind : plane
 - width : 1
 - tile size : 1
+- set up : grass_set_up
 
 ::server::
 - side : server
 - library : ../target/release/libbasegame_server.so
-- hash : 64d149f570e07517
+- hash : 2fd228c45124b553
 - depends on :
-- common
+    -- common
 
-
-grass_seen :
+grass_tick :
 - kind : sca proc
+- planes :
+    -- common>grass
+- set up : grass_tick_set_up

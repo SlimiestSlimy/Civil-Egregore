@@ -33,7 +33,7 @@ pub(super) fn check_across_mods(manifests: &[Manifest]) -> Result<(), ManifestEr
     for (bundle_name, &(manifest, bundle)) in &bundles_by_name {
         check_dependencies(manifest, bundle_name, bundle, &bundles_by_name)?;
         for bundle_type in &bundle.types {
-            check_reference(manifest, bundle_name, bundle, bundle_type, &bundles_by_name)?;
+            check_references(manifest, bundle_name, bundle, bundle_type, &bundles_by_name)?;
         }
     }
     check_no_ring_of_dependencies(&bundles_by_name)?;
@@ -76,15 +76,16 @@ struct Reference<'kind> {
     kind_word: &'static str,
 }
 
-/// The type `kind` names, if any: no kind names more than one.
-fn reference(kind: &Kind) -> Option<Reference<'_>> {
-    let (field, named, of_its_kind, kind_word): (_, _, fn(&Kind) -> bool, _) = match kind {
-        Kind::Entity { default_attribute: Some(attribute) } => ("default attribute", attribute, |named| matches!(named, Kind::Attribute { .. }), "attribute"),
-        Kind::EntityProc { entity } => ("entity", entity, |named| matches!(named, Kind::Entity { .. }), "entity"),
-        Kind::Gui { parent: Some(parent) } => ("parent", parent, |named| matches!(named, Kind::Gui { .. }), "gui"),
-        _ => return None,
+/// The types `kind` names: one field's, as many as it names.
+fn references(kind: &Kind) -> Vec<Reference<'_>> {
+    let (field, named, of_its_kind, kind_word): (_, Vec<&TypeName>, fn(&Kind) -> bool, _) = match kind {
+        Kind::Entity { default_attribute: Some(attribute) } => ("default attribute", vec![attribute], |named| matches!(named, Kind::Attribute { .. }), "attribute"),
+        Kind::EntityProc { entity } => ("entity", vec![entity], |named| matches!(named, Kind::Entity { .. }), "entity"),
+        Kind::ScaProc { planes } => ("planes", planes.iter().collect(), |named| matches!(named, Kind::Plane { .. }), "plane"),
+        Kind::Gui { parent: Some(parent) } => ("parent", vec![parent], |named| matches!(named, Kind::Gui { .. }), "gui"),
+        _ => return Vec::new(),
     };
-    Some(Reference { field, named, of_its_kind, kind_word })
+    named.into_iter().map(|named| Reference { field, named, of_its_kind, kind_word }).collect()
 }
 
 /// The type `type_name` names, if its bundle has it.
@@ -92,21 +93,21 @@ fn type_named<'mods>(type_name: &TypeName, bundles_by_name: &BundlesByName<'mods
     bundles_by_name.get(&type_name.bundle_name)?.1.types.iter().find(|bundle_type| bundle_type.name == type_name.type_name)
 }
 
-/// The type `bundle_type` names, if any: in its own bundle or in one its
-/// bundle depends on, there, and of the kind its field wants.
-fn check_reference(manifest: &Manifest, bundle_name: &BundleName, bundle: &Bundle, bundle_type: &Type, bundles_by_name: &BundlesByName) -> Result<(), ManifestError> {
-    let Some(Reference { field, named, of_its_kind, kind_word }) = reference(&bundle_type.kind) else {
-        return Ok(());
-    };
+/// The types `bundle_type` names, if any: each in its own bundle or in
+/// one its bundle depends on, there, and of the kind its field wants.
+fn check_references(manifest: &Manifest, bundle_name: &BundleName, bundle: &Bundle, bundle_type: &Type, bundles_by_name: &BundlesByName) -> Result<(), ManifestError> {
     let section = TypeName { bundle_name: bundle_name.clone(), type_name: bundle_type.name.clone() }.to_string();
-    if named.bundle_name != *bundle_name && !bundle.fields.depends_on.contains(&named.bundle_name) {
-        return Err(refused(manifest, &section, format!("{field}: {named} is of a bundle {bundle_name} does not depend on")));
+    for Reference { field, named, of_its_kind, kind_word } in references(&bundle_type.kind) {
+        if named.bundle_name != *bundle_name && !bundle.fields.depends_on.contains(&named.bundle_name) {
+            return Err(refused(manifest, &section, format!("{field}: {named} is of a bundle {bundle_name} does not depend on")));
+        }
+        match type_named(named, bundles_by_name) {
+            None => return Err(refused(manifest, &section, format!("{field}: no type is {named}"))),
+            Some(found) if !of_its_kind(&found.kind) => return Err(refused(manifest, &section, format!("{field}: {named} is no {kind_word}"))),
+            Some(_) => {}
+        }
     }
-    match type_named(named, bundles_by_name) {
-        None => Err(refused(manifest, &section, format!("{field}: no type is {named}"))),
-        Some(found) if !of_its_kind(&found.kind) => Err(refused(manifest, &section, format!("{field}: {named} is no {kind_word}"))),
-        Some(_) => Ok(()),
-    }
+    Ok(())
 }
 
 /// No bundle depends on itself through others.

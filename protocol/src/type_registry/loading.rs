@@ -1,10 +1,9 @@
 //! The registry's libraries loaded for one side ([`TypeRegistry::load`]):
 //! every bundle of the common side and that one, dependencies first,
-//! each library opened and its bundle set up ([`BUNDLE_SET_UP`]) -- given
-//! the registry and the code of the bundles before it, to take what it
-//! needs of them once -- its code matched to the bundle's types as the
-//! manifests say them: a name it has no type of, a type of a kind with
-//! code it gives none, refused.
+//! each library opened and each of its types with a set up function set
+//! up -- the function its manifest names, a [`TypeSetUp`], given the
+//! registry and the code of the types before it, to take what it needs
+//! of them once.
 
 use super::TypeRegistry;
 use crate::kinds::{Kind, Side};
@@ -12,21 +11,18 @@ use std::any::Any;
 use std::collections::HashMap;
 use utilities::dynamic_library::DynamicLibrary;
 
-/// What a bundle's library makes of a type: its code, or what its
+/// What a type's set up function makes of it: its code, or what its
 /// dependents take of it -- for them, and for the side, to downcast to
 /// what they know it as.
 pub type Export = Box<dyn Any + Send + Sync>;
 
-/// The function every bundle's library exports as [`BUNDLE_SET_UP`]: its
-/// types' code, each by its name in the bundle, made with what it takes
-/// of the registry and of the bundles before it.
-pub type BundleSetUp = fn(&TypeRegistryHandle<'_>) -> Result<Vec<(&'static str, Export)>, String>;
+/// A type's set up function, as its bundle's library exports it, by the
+/// name its manifest gives: its code, made with what it takes of the
+/// registry and of the types before it.
+pub type TypeSetUp = fn(&TypeRegistryHandle<'_>) -> Result<Export, String>;
 
-/// The name a bundle's library exports its [`BundleSetUp`] as.
-pub const BUNDLE_SET_UP: &str = "bundle_set_up";
-
-/// What a bundle is set up with: the registry -- every type's ID and full
-/// name -- and the code of every bundle set up before it.
+/// What a type is set up with: the registry -- every type's ID and full
+/// name -- and the code of every type set up before it.
 pub struct TypeRegistryHandle<'loading> {
     /// The registry.
     registry: &'loading TypeRegistry,
@@ -45,8 +41,8 @@ impl TypeRegistryHandle<'_> {
         self.registry.types.iter().find(|registered| registered.full_name == full_name).map(|registered| registered.type_id)
     }
 
-    /// What the bundle of the type of the full name `full_name` made of
-    /// it, if it was set up before and made anything: to downcast.
+    /// What the set up function of the type of the full name `full_name`
+    /// made of it, if it was set up before: to downcast.
     pub fn code_of(&self, full_name: &str) -> Option<&(dyn Any + Send + Sync)> {
         self.code.get(&self.type_id_of(full_name)?).map(|export| &**export)
     }
@@ -80,15 +76,11 @@ impl LoadedRegistry {
     }
 }
 
-/// Whether a type of `kind` has code its bundle must make.
-fn has_code(kind: &Kind) -> bool {
-    matches!(kind, Kind::EntityProc { .. } | Kind::ScaProc | Kind::Worldgen | Kind::RenderProc { .. } | Kind::Gui { .. })
-}
-
 impl TypeRegistry {
     /// Its libraries loaded for `side` -- the common bundles' and the
     /// side's, each after every bundle it depends on, the first by name
-    /// among those ready -- each bundle set up: or what went wrong.
+    /// among those ready -- each bundle's types set up in its order: or
+    /// what went wrong.
     pub fn load(self, side: Side) -> Result<LoadedRegistry, String> {
         let mut waiting: Vec<usize> = (0..self.types.len()).filter(|&place| matches!(&self.types[place].kind, Kind::Bundle(fields) if fields.side == Side::Common || fields.side == side)).collect();
         let (mut code, mut libraries, mut set_up) = (HashMap::new(), Vec::new(), Vec::<String>::new());
@@ -104,23 +96,13 @@ impl TypeRegistry {
             let bundle = &self.types[next];
             let Kind::Bundle(fields) = &bundle.kind else { unreachable!("bundles alone wait") };
             let library = DynamicLibrary::open(&fields.library)?;
-            // SAFETY: built by the same compiler, against this very crate: the library's `bundle_set_up` is a `BundleSetUp`.
-            let bundle_set_up = unsafe { library.function::<BundleSetUp>(BUNDLE_SET_UP) }?;
-            let made = bundle_set_up(&TypeRegistryHandle { registry: &self, code: &code }).map_err(|why| format!("{}: {why}", bundle.full_name))?;
-            let prefix = format!("{}{}", bundle.full_name, crate::type_names::NAME_SEPARATOR);
-            let mut made_for = Vec::new();
-            for (type_name, export) in made {
-                let full_name = format!("{prefix}{type_name}");
-                let Some(registered) = self.types.iter().find(|registered| registered.full_name == full_name) else {
-                    return Err(format!("{}: code for {type_name}, a type the manifest does not give it", bundle.full_name));
-                };
-                if code.insert(registered.type_id, export).is_some() {
-                    return Err(format!("{}: code for {type_name} made twice", bundle.full_name));
-                }
-                made_for.push(full_name);
-            }
-            if let Some(without) = self.types.iter().find(|registered| registered.full_name.starts_with(&prefix) && has_code(&registered.kind) && !made_for.contains(&registered.full_name)) {
-                return Err(format!("{}: no code for {}", bundle.full_name, without.full_name));
+            // A bundle's types follow it, up to the next bundle.
+            for registered in self.types[next + 1..].iter().take_while(|registered| !matches!(registered.kind, Kind::Bundle(_))) {
+                let Some(function_name) = &registered.set_up else { continue };
+                // SAFETY: built by the same compiler, against this very crate: the function the manifest names is a `TypeSetUp`.
+                let type_set_up = unsafe { library.function::<TypeSetUp>(function_name) }.map_err(|why| format!("{}: {why}", registered.full_name))?;
+                let made = type_set_up(&TypeRegistryHandle { registry: &self, code: &code }).map_err(|why| format!("{}: {why}", registered.full_name))?;
+                code.insert(registered.type_id, made);
             }
             set_up.push(bundle.full_name.clone());
             libraries.push(library);

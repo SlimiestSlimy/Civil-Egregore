@@ -18,6 +18,8 @@ pub(crate) enum Token {
     },
     /// A dash at a line's start: an item opens.
     Dash,
+    /// Two dashes at a line's start: a list's last item opens.
+    LastDash,
     /// A colon anywhere but at a line's start: a pair.
     Colon,
     /// Text on one line between two marks, its ends' spaces let go.
@@ -26,13 +28,9 @@ pub(crate) enum Token {
     Quoted(String),
     /// One line's end between two lines with something on them.
     LineEnd,
-    /// One empty line between two lines with something on them: a line
-    /// of a comment alone is no line at all.
+    /// Empty lines, one or more, between two lines with something on
+    /// them: a line of a comment alone is no line at all.
     BlankLine,
-    /// Two empty lines or more between two lines with something on them
-    /// -- a triple newline -- which ends a list always, and is a blank
-    /// line besides.
-    ListEnd,
 }
 
 /// A token, and the line it starts on, counted from 1.
@@ -107,17 +105,19 @@ impl Tokenizer<'_> {
     /// section's line, a dash or a colon, line ends between let be.
     fn element_may_start(&self) -> bool {
         let last_mark = self.tokens.iter().rev().map(|located| &located.token).find(|&token| *token != Token::LineEnd);
-        matches!(last_mark, None | Some(Token::BlankLine | Token::ListEnd | Token::SectionHeader { .. } | Token::Dash | Token::Colon))
+        matches!(last_mark, None | Some(Token::BlankLine | Token::SectionHeader { .. } | Token::Dash | Token::LastDash | Token::Colon))
     }
 
     /// Every line, one after another: each line with something on it
-    /// after the first parted from the one before by a line end, a blank
-    /// line if one line between was empty, or a list's end if more were
-    /// -- one of a comment alone not counted.
+    /// after the first parted from the one before by a line end, or a
+    /// blank line if any line between was empty -- one of a comment alone
+    /// not counted.
     fn read_all(&mut self) -> Result<(), CdnfError> {
         let (mut anything_yet, mut empty_between) = (false, 0);
         while self.peek().is_some() {
+            let line_began = self.at;
             self.skip_spaces();
+            let indented = self.at != line_began;
             let comment_began = self.at;
             self.skip_comment();
             let only_a_comment = self.at != comment_began;
@@ -132,25 +132,27 @@ impl Tokenizer<'_> {
                 Some(_) => {}
             }
             if anything_yet {
-                self.push(match empty_between {
-                    0 => Token::LineEnd,
-                    1 => Token::BlankLine,
-                    _ => Token::ListEnd,
-                });
+                self.push(if empty_between == 0 { Token::LineEnd } else { Token::BlankLine });
             }
             (anything_yet, empty_between) = (true, 0);
-            self.read_line()?;
+            self.read_line(indented)?;
         }
         Ok(())
     }
 
     /// One line with something on it, from its first mark to past its
-    /// line's end: a section's line, or its tokens -- a dash first if
-    /// it starts with one.
-    fn read_line(&mut self) -> Result<(), CdnfError> {
-        match self.peek() {
-            Some(b':') => self.section_header()?,
-            Some(b'-') => {
+    /// line's end: a section's line -- at the line's very start, none
+    /// `indented` -- or its tokens, a dash first, or two, if it starts
+    /// with them.
+    fn read_line(&mut self, indented: bool) -> Result<(), CdnfError> {
+        match (self.peek(), self.text.get(self.at + 1)) {
+            (Some(b':'), _) if indented => return Self::refused(self.line, "a section's line starts at the line's very start: no space before its colons"),
+            (Some(b':'), _) => self.section_header()?,
+            (Some(b'-'), Some(b'-')) => {
+                self.push(Token::LastDash);
+                self.at += 2;
+            }
+            (Some(b'-'), _) => {
                 self.push(Token::Dash);
                 self.at += 1;
             }

@@ -40,10 +40,9 @@ impl Parser {
         Err(CdnfError { line, what: what.into() })
     }
 
-    /// Past the line ends, blank lines and list ends up to what comes
-    /// next: no list open there for a list end to end.
+    /// Past the line ends and blank lines up to what comes next.
     fn skip_line_ends(&mut self) {
-        while matches!(self.peek(), Some(Token::LineEnd | Token::BlankLine | Token::ListEnd)) {
+        while matches!(self.peek(), Some(Token::LineEnd | Token::BlankLine)) {
             self.next += 1;
         }
     }
@@ -69,7 +68,7 @@ impl Parser {
             None => return self.refused("an element wanted, and the text ended"),
             Some(Token::SectionHeader { .. }) => return self.refused("an element wanted, and a section opens"),
             Some(Token::Colon) => return self.refused("a colon with nothing before it"),
-            Some(Token::Dash) => return self.list(),
+            Some(Token::Dash | Token::LastDash) => return self.list(),
             Some(Token::Quoted(_)) => {
                 let Some(Token::Quoted(quoted)) = self.take() else { unreachable!("peeked") };
                 if matches!(self.peek(), Some(Token::Text(_))) {
@@ -78,7 +77,7 @@ impl Parser {
                 Element::Text(quoted)
             }
             Some(Token::Text(_)) => self.text_body(),
-            Some(Token::LineEnd | Token::BlankLine | Token::ListEnd) => unreachable!("line ends skipped"),
+            Some(Token::LineEnd | Token::BlankLine) => unreachable!("line ends skipped"),
         };
         if self.peek() != Some(&Token::Colon) {
             return Ok(first);
@@ -88,21 +87,19 @@ impl Parser {
     }
 
     /// A list: a dash and the element after it, an item each, while a
-    /// dash follows the last -- blank lines between let be -- until a
-    /// list end, taken: it ends this list alone, so a list nested in an
-    /// item ends and the one it is in goes on.
+    /// dash follows the last -- blank lines between let be -- until the
+    /// item of two dashes, its last: so a list nested in an item ends,
+    /// and the one it is in goes on.
     fn list(&mut self) -> Result<Element, CdnfError> {
         let mut items = Vec::new();
-        while self.peek() == Some(&Token::Dash) {
+        while let Some(dash @ (Token::Dash | Token::LastDash)) = self.peek() {
+            let last_item = *dash == Token::LastDash;
             self.next += 1;
             items.push(self.element()?);
-            while matches!(self.peek(), Some(Token::LineEnd | Token::BlankLine)) {
-                self.next += 1;
-            }
-            if self.peek() == Some(&Token::ListEnd) {
-                self.next += 1;
+            if last_item {
                 break;
             }
+            self.skip_line_ends();
         }
         Ok(Element::List(items))
     }

@@ -151,7 +151,23 @@ fn read_type(bundle_name: &BundleName, type_name: &str, items: &[Element]) -> Re
             Kind::Attribute { size }
         }
         "entity proc" => Kind::EntityProc { entity: reference(fields.text("entity")?)? },
-        "sca proc" => Kind::ScaProc,
+        "sca proc" => {
+            let mut planes = Vec::new();
+            for plane_element in fields.optional_list("planes")? {
+                let Element::Text(plane_text) = plane_element else {
+                    return Err("planes: a list of planes".to_string());
+                };
+                let plane = reference(plane_text)?;
+                if planes.contains(&plane) {
+                    return Err(format!("planes: {plane} said twice"));
+                }
+                planes.push(plane);
+            }
+            if planes.is_empty() {
+                return Err("planes: missing, the planes it is sampled on, one or more".to_string());
+            }
+            Kind::ScaProc { planes }
+        }
         "worldgen" => Kind::Worldgen,
         "client call" => Kind::ClientCall,
         "render proc" => Kind::RenderProc { draw_order: number_of(fields.text("draw order")?)? },
@@ -169,8 +185,21 @@ fn read_type(bundle_name: &BundleName, type_name: &str, items: &[Element]) -> Re
         }
         hooks.push(hook);
     }
+    let set_up = fields.optional_text("set up")?;
+    match set_up {
+        Some(function_name) if !is_a_function_name(function_name) => return Err(format!("set up: `{function_name}` is no function's name: a letter or _ first, then letters, 0-9 and _")),
+        None if kind.has_code() => return Err(format!("set up: missing, a {}'s code its function's to make", kind_word(&kind))),
+        _ => {}
+    }
     fields.none_left(&format!("a {}", kind_word(&kind)))?;
-    Ok(Type { name: type_name.to_string(), kind, hooks })
+    Ok(Type { name: type_name.to_string(), kind, hooks, set_up: set_up.map(str::to_string) })
+}
+
+/// Whether `text` is a function's name as Rust exports it unmangled: a
+/// letter or _ first, then letters, 0-9 and _.
+fn is_a_function_name(text: &str) -> bool {
+    let mut characters = text.chars();
+    characters.next().is_some_and(|first| first.is_ascii_alphabetic() || first == '_') && characters.all(|each| each.is_ascii_alphanumeric() || each == '_')
 }
 
 /// The type `text` names, from the bundle `bundle_name`
@@ -202,7 +231,7 @@ fn kind_word(kind: &Kind) -> &'static str {
         Kind::Entity { .. } => "entity",
         Kind::Attribute { .. } => "attribute",
         Kind::EntityProc { .. } => "entity proc",
-        Kind::ScaProc => "sca proc",
+        Kind::ScaProc { .. } => "sca proc",
         Kind::Worldgen => "worldgen",
         Kind::ClientCall => "client call",
         Kind::RenderProc { .. } => "render proc",
@@ -215,7 +244,7 @@ fn side_of(kind: &Kind) -> Side {
     match kind {
         Kind::Bundle(fields) => fields.side,
         Kind::Plane { .. } | Kind::Attribute { .. } | Kind::ClientCall => Side::Common,
-        Kind::Entity { .. } | Kind::EntityProc { .. } | Kind::ScaProc | Kind::Worldgen => Side::Server,
+        Kind::Entity { .. } | Kind::EntityProc { .. } | Kind::ScaProc { .. } | Kind::Worldgen => Side::Server,
         Kind::RenderProc { .. } | Kind::Gui { .. } => Side::Client,
     }
 }

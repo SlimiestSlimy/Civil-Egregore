@@ -61,22 +61,25 @@ sheep_data :
 - library : libbase_server.so
 - hash : {libbase_server.so}
 - depends on :
-- base_common
+    -- base_common
 
 sheep :
 - kind : entity
 - default attribute : base_common>sheep_data
 - hooks :
-- keeps the world hot
-
+    -- keeps the world hot
 
 grass_grows :
 - kind : sca proc
+- planes :
+    -- base_common>grass
+- set up : grass_grows_set_up
 
 world_generation :
 - kind : worldgen
+- set up : world_generation_set_up
 - hooks :
-- generates the world
+    -- generates the world
 ");
     let drawn = mod_made(&test_folder, "drawn", &[("libdrawn.so", b"client bytes")], "\
 :drawn:
@@ -86,17 +89,18 @@ world_generation :
 - library : libdrawn.so
 - hash : {libdrawn.so}
 - depends on :
-- base>base_common
-
+    -- base>base_common
 
 grass_drawn :
 - kind : render proc
 - draw order : 3
+- set up : grass_drawn_set_up
 
 main_window :
 - kind : gui
+- set up : main_window_set_up
 - hooks :
-- shown by default
+    -- shown by default
 
 ");
     let manifests = read_mods(&[base.clone(), drawn.clone()]).expect("read and checked");
@@ -108,6 +112,8 @@ main_window :
     let sheep = &server.types()[0];
     assert_eq!((sheep.kind(), sheep.hooks()), (&Kind::Entity { default_attribute: Some(named("base", "base_common", "sheep_data")) }, &[Hook::KeepsTheWorldHot][..]));
     assert_eq!(base_manifest.bundles()[0].types()[0].kind(), &Kind::Plane { width_bits: 4, tile_size: 8 });
+    let grass_grows = &server.types()[1];
+    assert_eq!((grass_grows.kind(), grass_grows.set_up()), (&Kind::ScaProc { planes: vec![named("base", "base_common", "grass")] }, Some("grass_grows_set_up")));
     let client = &drawn_manifest.bundles()[0];
     assert_eq!((client.fields().side, client.types()[0].kind(), client.types()[1].hooks()), (Side::Client, &Kind::RenderProc { draw_order: 3 }, &[Hook::ShownByDefault][..]));
 
@@ -119,7 +125,7 @@ main_window :
 - library : libwrong.so
 - hash : {libwrong.so}
 - depends on :
-- base>base_server
+    -- base>base_server
 ");
     let refusal = read_mods(&[base, drawn, wrong_side]).expect_err("a client bundle on a server one");
     assert!(refusal.what.contains("depends on base>base_server"), "{refusal}");

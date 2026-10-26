@@ -20,15 +20,17 @@ items:
 - three
   on two lines
 - nested :
-- inner one
-- inner two
-
-
+    - inner one
+    -- inner two
 - back in the outer list
-- nested again :
-- inner three
-
-
+-       spaced out       :       xd
+- two deep :
+    -- one deep :
+        - c1
+        -- c2
+- back after two lists ended at once
+-- nested again :
+    -- inner three
 
 after the list
 

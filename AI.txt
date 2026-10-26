@@ -554,6 +554,43 @@ NOW
   version and the crate's place in its workspace, not the machine. The
   remote's rustup default (1.97) failed the mod's build -- a mod outside
   the tree does not see rust-toolchain.toml (in LATER).
+- THE MOD PACKAGER, STEP 5 (2026-10-25, "yeah, i agree on the path"):
+  the manifest builder is a macro at mod level, in protocol -- "the
+  other option is to have the manifest builder on protocol, since mods
+  depend on the game anyways lol, and that way we dont have to make mods
+  depend on mod packager" -- the mod packager a binary alone ("modpackager
+  binary is what packages the mod"). The mod's root crate, depending on
+  its bundle crates, holds the one declaration (mod name, bundles, types,
+  each type's set up function by path, so the compiler checks it); the
+  packager runs it for the manifest, hashes, writes, reads it back.
+  Each type's set up function named in the manifest (`set up`), looked
+  up in its bundle's library by that name: bundle_set_up gone ("B yeah,
+  it matches everything tbh") -- no list of a bundle's types written
+  twice. Set up still bundle by bundle, dependencies first; required
+  for kinds with code, optional for the rest (what a type gives its
+  dependents, as common's grass its TypeName). Setup functions
+  #[unsafe(no_mangle)], unique in their library. basegame's grass_seen
+  renamed grass_tick ("rename it grass_tick lol"), sampled on
+  common>grass; meadow_grows on basegame>common>grass too.
+- SCA PROCS NAME THEIR PLANES (2026-10-25): "remember when i said that
+  sca rules are sample automatically, well we also need to say on what
+  planes are they sampled against HAHAHAHA,could be more than one btw" --
+  Kind::ScaProc { planes }, the manifest's `planes` list, one or more,
+  each a plane its bundle may name. And the proc's own call, once set
+  up, the server's trait: "we also pass the id of the plane the server
+  is sampling so the sca proc knows what is being sampled" -- the server
+  handle and the sampled plane's ID.
+- CDNF LISTS END ON A DOUBLE DASH (2026-10-25): "lets change the
+  newline rule of lists termination to double dash means last element,
+  simple as that" -- `--` at a line's start opens a list's last item, the
+  list ending after it (or where no dash follows); the triple newline
+  gone, any run of empty lines one blank line. The writer ("wait you're
+  going too fast ... i havent said a single thing about ita design"):
+  a typestate builder emitting tokens, everything given impl Display, no
+  Result; quoted only for quotes, colons, # and the like, or two newlines
+  in a row; newlines as the tokens joined need, none at all at times;
+  everything on a pair's right but a text indented; "make the end()
+  functions be end_list() style for better readability".
 - CSV GONE (2026-10-25): "delete csv from utilities and move cdnf there
   lol" -- utilities::cdnf (and cdnf::quoted, to write a quoted text);
   settings in settings.cdnf, a list of "name" : "value", values quoted;

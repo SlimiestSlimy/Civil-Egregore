@@ -9,7 +9,7 @@ use crate::manifests::Manifest;
 use crate::type_names::{BundleName, TypeName};
 
 mod loading;
-pub use loading::{BundleSetUp, Export, LoadedRegistry, TypeRegistryHandle, BUNDLE_SET_UP};
+pub use loading::{Export, LoadedRegistry, TypeRegistryHandle, TypeSetUp};
 
 /// Where an ID keeps its kind: its first byte, over its number.
 pub const KIND_SHIFT: u32 = 56;
@@ -23,7 +23,7 @@ pub fn kind_byte(kind: &Kind) -> u8 {
         Kind::Attribute { .. } => 0x00,
         Kind::Plane { .. } => 0x01,
         Kind::Entity { .. } => 0x02,
-        Kind::ScaProc => 0x03,
+        Kind::ScaProc { .. } => 0x03,
         Kind::EntityProc { .. } => 0x04,
         Kind::Worldgen => 0x05,
         Kind::RenderProc { .. } => 0x06,
@@ -33,8 +33,8 @@ pub fn kind_byte(kind: &Kind) -> u8 {
     }
 }
 
-/// A type as the registry keeps it: its ID, its full name, its kind and
-/// its hooks.
+/// A type as the registry keeps it: its ID, its full name, its kind, its
+/// hooks and its set up function's name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegisteredType {
     /// Its ID: its kind's byte over its number.
@@ -45,6 +45,9 @@ pub struct RegisteredType {
     kind: Kind,
     /// Its hooks.
     hooks: Vec<Hook>,
+    /// The name its bundle's library exports its set up function as, if
+    /// it has one.
+    set_up: Option<String>,
 }
 
 impl RegisteredType {
@@ -68,6 +71,10 @@ impl RegisteredType {
         &self.hooks
     }
 
+    /// The name its set up function is exported as, if it has one.
+    pub fn set_up(&self) -> Option<&str> {
+        self.set_up.as_deref()
+    }
 }
 
 /// Every type of a world's mods, one flat list.
@@ -84,19 +91,19 @@ impl TypeRegistry {
     /// bundle's library's path is made whole, from its mod's folder.
     pub fn of_manifests(manifests: &[Manifest]) -> Self {
         let mut types = Vec::new();
-        let mut give = |full_name: String, kind: Kind, hooks: Vec<Hook>| {
+        let mut give = |full_name: String, kind: Kind, hooks: Vec<Hook>, set_up: Option<&str>| {
             let type_id = u64::from(kind_byte(&kind)) << KIND_SHIFT | types.len() as u64;
-            types.push(RegisteredType { type_id, full_name, kind, hooks });
+            types.push(RegisteredType { type_id, full_name, kind, hooks, set_up: set_up.map(str::to_string) });
         };
         for manifest in manifests {
             for bundle in manifest.bundles() {
                 let bundle_name = BundleName { mod_name: manifest.name().to_string(), bundle: bundle.name().to_string() };
                 // Its library's path made whole: from its mod's folder.
                 let fields = BundleFields { library: manifest.folder().join(&bundle.fields().library), ..bundle.fields().clone() };
-                give(bundle_name.to_string(), Kind::Bundle(fields), Vec::new());
+                give(bundle_name.to_string(), Kind::Bundle(fields), Vec::new(), None);
                 for bundle_type in bundle.types() {
                     let type_name = TypeName { bundle_name: bundle_name.clone(), type_name: bundle_type.name().to_string() };
-                    give(type_name.to_string(), bundle_type.kind().clone(), bundle_type.hooks().to_vec());
+                    give(type_name.to_string(), bundle_type.kind().clone(), bundle_type.hooks().to_vec(), bundle_type.set_up());
                 }
             }
         }
