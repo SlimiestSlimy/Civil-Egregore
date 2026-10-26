@@ -554,24 +554,115 @@ NOW
   version and the crate's place in its workspace, not the machine. The
   remote's rustup default (1.97) failed the mod's build -- a mod outside
   the tree does not see rust-toolchain.toml (in LATER).
-- THE MOD PACKAGER, STEP 5 (2026-10-25, "yeah, i agree on the path"):
-  the manifest builder is a macro at mod level, in protocol -- "the
-  other option is to have the manifest builder on protocol, since mods
-  depend on the game anyways lol, and that way we dont have to make mods
-  depend on mod packager" -- the mod packager a binary alone ("modpackager
-  binary is what packages the mod"). The mod's root crate, depending on
-  its bundle crates, holds the one declaration (mod name, bundles, types,
-  each type's set up function by path, so the compiler checks it); the
-  packager runs it for the manifest, hashes, writes, reads it back.
-  Each type's set up function named in the manifest (`set up`), looked
-  up in its bundle's library by that name: bundle_set_up gone ("B yeah,
-  it matches everything tbh") -- no list of a bundle's types written
-  twice. Set up still bundle by bundle, dependencies first; required
-  for kinds with code, optional for the rest (what a type gives its
-  dependents, as common's grass its TypeName). Setup functions
-  #[unsafe(no_mangle)], unique in their library. basegame's grass_seen
-  renamed grass_tick ("rename it grass_tick lol"), sampled on
-  common>grass; meadow_grows on basegame>common>grass too.
+- THE MOD PACKAGER, STEP 5, REDONE (2026-10-26): no manifest builder,
+  no macro -- "make the packager do all those checks, make the manifest
+  written by hand by the mod, but excluding hashes and all that stuff,
+  basically a "premanifest.cdnf" which later the mod packages checks by
+  hand basically" / "i think its a sound plan". (On the way: a builder
+  taking the function itself needed no macro, std::any::type_name giving
+  its path -- moot now.)
+  NAMES BY CONVENTION ("since library names follow a specific convention
+  we can derive the library name from the bundle name"): a bundle's crate
+  is <mod>_<bundle>, its library lib<mod>_<bundle>.so (- made _, as cargo
+  does; std's DLL_PREFIX/DLL_SUFFIX) beside the manifest -- no `crate`
+  field in the premanifest, no `library` in the manifest. The two files
+  differ by `hash` alone, and by the premanifest's dependency folders.
+  DEPENDENCY FOLDERS IN THE PREMANIFEST ("making this premanifest.cdnf
+  also include dependency paths lol, so the packager only needs to read
+  the premanifest.cdnf and can build the entire mod ... make the package
+  builder generate the files automatically"): at mod level, before the
+  bundles, `depends on mods :` pairs of a mod's name and its packaged
+  folder ("mod dependencies involves pointing to the mod folder to see
+  the libraries"). Never in the shipped manifest. The game's path not
+  written anywhere: the packager is the game's and knows it.
+  THE PREMANIFEST'S READER IS THE PACKAGER'S ("i do have my doubts
+  about mixing manifest and premanifest parsers into one tho, we
+  probably want "premanifest" to be a separate library in modpackager
+  using the same internals as manifest ideally"): protocol's reader
+  splits read_bundle -- a public shared part (name, side, depends on,
+  types, side checks; the leftover FieldList handed back) and the
+  manifest's own (hash, checked against the library); read_type and
+  FieldList public. Manifest's fields private still: protocol alone
+  makes one. "i believe the dependency of modpackager on protocol is
+  justified".
+  The packager, a binary of the game's (`cargo package_mod <mod folder>`
+  from the game; then from the mod by the alias it writes):
+  1. premanifest.cdnf read: every check one mod can make alone, before
+     anything is built; its own Premanifest type, no hashes.
+  2. The mod's .cargo/config.toml and rust-toolchain.toml generated
+     (machine's own, ignored by git): target folder, the game's flags,
+     --extern and -L for the game's libraries and each dependency's
+     (its manifest read first, with every check, hashes too), an alias;
+     the game's toolchain copied (the remote test's E0514). Then the
+     mod's workspace built.
+  3. Every set up function checked, no library opened: a generated .rs
+     in target/, compiled and linked by rustc against the built bundles
+     (--extern each, -L native), never run -- per function a
+     `const _: TypeSetUp = <crate>::<function>;` (there, its signature
+     right: E0308 otherwise) and a declaration in an `unsafe extern
+     "Rust"` block, all of them in a `#[used] static` (exported
+     #[no_mangle]: the linker's "undefined symbol" otherwise). Built as a
+     program, `fn main() {}` -- a program's names all resolved at link
+     on every OS, no flag: "as long as the only part of the code that
+     has to be os aware is the library loader im happy" (a cdylib
+     needed Linux's -z defs, refused). Without a use (no #[used], no
+     black_box) the missing export passed at every opt level.
+     A set up function must be reachable at its bundle crate's root --
+     defined there or `pub use`d there (E0425 otherwise, the packager
+     saying so); its export is under its bare name wherever it is
+     defined, a module or a helper crate (tried). "i still dont see a
+     reason to support nested bundles so this rule of "reachable from
+     root" is fine". Known gap, left: the export check proves the name
+     exported by some library on the link line, not by this bundle's
+     (a `pub use` of the common bundle's function from the server's):
+     the game then says "undefined symbol" at load, cleanly -- the
+     signature checked all the same. Written in
+     mod_packager/known_bugs.md: "annotate that on a "known bugs.md file
+     on the mod packager, that is important". Tried on basegame
+     2026-10-26: 0.3 s; a wrong signature and a mangled-only function
+     each refused so. "i have my doubts about how that automatically
+     generated rust file works, and how are we checking libraries
+     safely to check for no_mangle".
+  4. manifest.cdnf written by the writer, from the Premanifest and the
+     hashes, into the package folder beside the libraries.
+  5. The packaged mod read back by read_mods with its dependencies: the
+     game's own check, hashes and every check across mods ("the final
+     checks is of the packaged mod lol").
+  Parameters (a plane's width, a proc's planes) checked for validity
+  only: nothing in code declares them.
+  MODS SHIPPED AS ZIPS, KEPT AS ZIPS (2026-10-26): "distributing
+  mods/game as folders ia ahooting ourselves in the foot, we need to
+  distribute as packaging files like zip for example" / "yeah, kept as
+  is. in fact if we can avoid caching them at all the better, im willing
+  to extract them every time thats just server startup cost. if we can
+  avoid having to put them on disk at all even the betterer, maybe
+  loading straight from a buffer can work?" -- a world's mods/ holds the
+  zips; the manifest read and the hashes made from the archive's
+  entries (validation extracts nothing); at run, only the libraries that
+  load taken out, every start, no cache: DynamicLibrary::from_bytes --
+  Linux memfd_create, opened by /proc/self/fd/<n> (tried 2026-10-26:
+  basegame's two libraries loaded from memory, their set ups found; each
+  library's SONAME lets the others' NEEDED match it); Windows has no
+  supported way (hand-made loaders break exceptions, TLS, and read as
+  malware), so a temporary folder each start, removed after. The
+  packager makes the zip. The `zip` crate (MIT, deflate alone) the
+  second third-party crate, at the root.
+  THE LIBRARY HASH (2026-10-26): "hash library instead of having our
+  own please" / "the library hash doesnt have to be fast, but it
+  definitely has to be resistant" / "change hexadecimal prefix to 0x" --
+  SHA-256 (sha2, the third crate, at the root), used as it is -- "do we
+  need a specific library hash in protocol though? ... just make it a
+  civil egregore dependency": no type of ours, the manifest's hash text,
+  `0x` and the digest's own hex ({:x}), the same as sha256sum's. utilities::hash_bytes gone; the internal hashes left be
+  ("for now leave them be").
+  TEMPLATING: "this possibility makes templating as easy as calling
+  mod_packager new a la cargo style lol" -- the mod template made by the
+  packager, as `cargo new` makes a crate.
+  Kept from before: each type's set up named in the manifest (`set
+  up`), looked up in its bundle's library by that name, bundle_set_up
+  gone ("B yeah, it matches everything tbh"); set up bundle by bundle,
+  dependencies first; required for kinds with code, optional for the
+  rest; setup functions #[unsafe(no_mangle)], unique in their library.
 - SCA PROCS NAME THEIR PLANES (2026-10-25): "remember when i said that
   sca rules are sample automatically, well we also need to say on what
   planes are they sampled against HAHAHAHA,could be more than one btw" --
@@ -739,6 +830,26 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- THE INTERNAL HASHES (2026-10-26): "our internal hashes are very bad
+  and artifact prone i have to note, they break the current determinism,
+  but changing the hash function doesn't break determinism just by
+  itself" -- utilities::hash's mix_word, slot, GOLDEN_RATIO (rng draws
+  with them, tessera's tables use them): any function the same on every
+  machine keeps a world following from its seed, so they may be
+  replaced; the worlds made before change, nothing more.
+- THE WINDOWS SYMBOL LIMIT (2026-10-26): "im also a tiny bit concerned
+  about the symbol limit on windows ngl, mainly for windows bevy builds
+  which already get close" / "when we get there we get there then". A
+  DLL exports 65,535 symbols at most (the format's, MSVC and GNU alike);
+  a Rust dylib exports nearly everything public, generics' instances
+  too. Bevy as one DLL is the risk, once the client is back: split it
+  into several wrapper dylibs, as cdnf sits inside utilities'; measure
+  first on Linux, `nm -D --defined-only | wc -l`.
+- THIRD-PARTY NOTICES (2026-10-26): "we have to kinda choose or make
+  some license or notice at least anyways at some point when we start
+  distributing the game" -- the repo has no license on purpose (all
+  rights reserved); Bevy, std, libloading need their license texts
+  shipped beside the game. cargo-about makes that file.
 - THE MOD TEMPLATE (2026-10-25): "thats exactly why were making a
   mod_template crate. empty, but with all the setup required lol,
   ideally the only setup is declaring the path of the game source
@@ -761,17 +872,6 @@ LATER (every "for later" of the user's, and mine, as said)
   a mod was made against. Seen 2026-10-26: cargo does not watch a
   library given by --extern, so `cargo build` in a mod after protocol
   was rebuilt rebuilt nothing; `cargo clean -p <bundle>` first did.
-- The manifest made in code (2026-10-25): a typestate builder the mod
-  imports from mod_packager, at mod level -- "a bundle basically
-  corresponds to a compilation unit ie a crate" -- the packager building
-  each bundle crate, hashing, writing the manifest "with the hashes and
-  all the details at once"; the builder takes each setup function only
-  so the compiler checks it ("its just a hack to make tye type system
-  work for us"). And a macro_rules! writing bundle_set_up: "we could
-  conceivably make the macro buold the manifest and registration
-  function, i dont see why not lol" -- "ok, for later, right now we need
-  the mod working, were hashing and making the manifests by hand for the
-  first few tries lol".
 - How a client call -- a common kind, whose code gets no handle -- is
   answered by the server: "let's leave the client call questions for
   when we start working on the client again lol" (2026-10-25).

@@ -19,6 +19,15 @@ edition = "2024"
 authors = ["SlimiestSlimy", "Opus 5.5 high"]
 repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
+# Every crate from outside the game, its version said once, here: kept to
+# a bare minimum, each one in place of what would be the game's own to
+# keep up for every OS.
+[workspace.dependencies]
+# The system's loader, on every OS (ISC).
+libloading = "0.8"
+# SHA-256, a library's hash: hard to forge (MIT or Apache-2.0).
+sha2 = "0.10"
+
 # Lines kept for the profilers -- perf, callgrind -- which say nothing
 # useful without them; they cost no speed.
 [profile.release]

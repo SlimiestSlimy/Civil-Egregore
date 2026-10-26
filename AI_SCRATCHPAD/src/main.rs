@@ -16,7 +16,7 @@ fn main() -> Result<(), String> {
     match arguments.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["hash", file] => {
             let bytes = std::fs::read(file).map_err(|io_error| format!("{file}: {io_error}"))?;
-            println!("{:016x}", utilities::hash::hash_bytes(&bytes));
+            println!("0x{:x}", <sha2::Sha256 as sha2::Digest>::digest(&bytes));
         }
         ["load", side, mod_folders @ ..] => {
             let side = match *side {

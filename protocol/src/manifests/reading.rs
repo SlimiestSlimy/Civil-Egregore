@@ -8,6 +8,7 @@
 use super::{Bundle, Manifest, ManifestError, Type};
 use cdnf::Element;
 use crate::kinds::{BundleFields, Hook, Kind, Side};
+use sha2::{Digest, Sha256};
 use crate::type_names::{is_a_name, BundleName, TypeName, NAME_SEPARATOR};
 use std::path::{Path, PathBuf};
 
@@ -97,8 +98,10 @@ fn read_bundle(mod_folder: &Path, mod_name: &str, section: &cdnf::Section) -> Re
     let mut fields = own_fields.ok_or_else(|| in_bundle("no list of the bundle's fields".to_string()))?;
     let side = word_of(&SIDE_WORDS, fields.text("side").map_err(in_bundle)?).map_err(in_bundle)?;
     let library = PathBuf::from(fields.text("library").map_err(in_bundle)?);
-    let hash_text = fields.text("hash").map_err(in_bundle)?;
-    let library_hash_said = (hash_text.len() == 16).then(|| u64::from_str_radix(hash_text, 16).ok()).flatten().ok_or_else(|| in_bundle(format!("hash: 16 hexadecimal digits, not `{hash_text}`")))?;
+    let library_hash_said = fields.text("hash").map_err(in_bundle)?;
+    if !library_hash_said.strip_prefix("0x").is_some_and(|digits| digits.len() == 64 && digits.bytes().all(|digit| digit.is_ascii_hexdigit())) {
+        return Err(in_bundle(format!("hash: 0x and 64 hexadecimal digits, not `{library_hash_said}`")));
+    }
     let mut depends_on = Vec::new();
     for dependency in fields.optional_list("depends on").map_err(in_bundle)? {
         let Element::Text(dependency_text) = dependency else {
@@ -115,11 +118,11 @@ fn read_bundle(mod_folder: &Path, mod_name: &str, section: &cdnf::Section) -> Re
     }
     let library_path = mod_folder.join(&library);
     let library_bytes = std::fs::read(&library_path).map_err(|io_error| in_bundle(format!("library {}: {io_error}", library_path.display())))?;
-    let library_hash_found = utilities::hash::hash_bytes(&library_bytes);
-    if library_hash_found != library_hash_said {
-        return Err(in_bundle(format!("library {}: its hash is {library_hash_found:016x}, the manifest says {library_hash_said:016x}", library.display())));
+    let library_hash_found = format!("0x{:x}", Sha256::digest(&library_bytes));
+    if !library_hash_found.eq_ignore_ascii_case(library_hash_said) {
+        return Err(in_bundle(format!("library {}: its hash is {library_hash_found}, the manifest says {library_hash_said}", library.display())));
     }
-    Ok(Bundle { name: section.name.clone(), fields: BundleFields { side, library, library_hash: library_hash_said, depends_on }, types })
+    Ok(Bundle { name: section.name.clone(), fields: BundleFields { side, library, library_hash: library_hash_found, depends_on }, types })
 }
 
 /// The type named `type_name` in the bundle `bundle_name`, its fields

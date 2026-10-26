@@ -3,7 +3,7 @@
 use protocol::kinds::{BundleFields, Kind, Side};
 use protocol::manifests::{read_mods, MANIFEST_FILE};
 use protocol::type_registry::{TypeRegistry, KIND_SHIFT};
-use utilities::hash::hash_bytes;
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 /// A mod's folder made in `test_folder`: its library `library_name`,
@@ -13,7 +13,7 @@ fn mod_made(test_folder: &Path, mod_name: &str, library_name: &str, library_byte
     let mod_folder = test_folder.join(mod_name);
     std::fs::create_dir_all(&mod_folder).expect("the mod's folder");
     std::fs::write(mod_folder.join(library_name), library_bytes).expect("the library written");
-    std::fs::write(mod_folder.join(MANIFEST_FILE), manifest.replace("{hash}", &format!("{:016x}", hash_bytes(library_bytes)))).expect("the manifest written");
+    std::fs::write(mod_folder.join(MANIFEST_FILE), manifest.replace("{hash}", &format!("0x{:x}", Sha256::digest(library_bytes)))).expect("the manifest written");
     mod_folder
 }
 

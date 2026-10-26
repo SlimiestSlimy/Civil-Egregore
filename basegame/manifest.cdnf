@@ -3,7 +3,7 @@
 ::common::
 - side : common
 - library : ../target/release/libbasegame_common.so
-- hash : 04b870fd66d985fa
+- hash : 0xa30b03804970239cd6215720a1c0756fbc1011fe01a6061997b46419f7a5409d
 
 grass :
 - kind : plane
@@ -14,7 +14,7 @@ grass :
 ::server::
 - side : server
 - library : ../target/release/libbasegame_server.so
-- hash : bb2d843c4907d8d9
+- hash : 0xd8060c612c63ff51dcdd2d456db2c9f985a487510b39d616a10500afc872b1d2
 - depends on :
     -- common
 

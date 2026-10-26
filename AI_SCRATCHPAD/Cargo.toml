@@ -9,3 +9,4 @@ description = "The AI's own scratchpad: probes of Civil Egregore, questions aske
 utilities = { path = "../utilities" }
 protocol = { path = "../protocol" }
 cdnf = { path = "../cdnf" }
+sha2 = { workspace = true }

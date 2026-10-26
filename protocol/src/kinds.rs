@@ -28,8 +28,9 @@ pub struct BundleFields {
     /// Its library: its path from its mod's folder, as a manifest says
     /// it; made whole, from there, in the type registry.
     pub library: PathBuf,
-    /// The library's hash ([`utilities::hash::hash_bytes`]).
-    pub library_hash: u64,
+    /// The library's hash, as the manifest writes it: SHA-256, `0x` and
+    /// 64 hexadecimal digits.
+    pub library_hash: String,
     /// The bundles it depends on: the only ones but its own whose types
     /// its types name.
     pub depends_on: Vec<BundleName>,

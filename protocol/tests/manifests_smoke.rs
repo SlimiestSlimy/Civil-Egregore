@@ -4,7 +4,7 @@
 
 use protocol::kinds::{Hook, Kind, Side};
 use protocol::manifests::{read_mods, MANIFEST_FILE};
-use utilities::hash::hash_bytes;
+use sha2::{Digest, Sha256};
 use protocol::type_names::{BundleName, TypeName};
 use std::path::{Path, PathBuf};
 
@@ -17,7 +17,7 @@ fn mod_made(test_folder: &Path, mod_name: &str, libraries: &[(&str, &[u8])], man
     let mut manifest = manifest.to_string();
     for &(library_name, library_bytes) in libraries {
         std::fs::write(mod_folder.join(library_name), library_bytes).expect("a library written");
-        manifest = manifest.replace(&format!("{{{library_name}}}"), &format!("{:016x}", hash_bytes(library_bytes)));
+        manifest = manifest.replace(&format!("{{{library_name}}}"), &format!("0x{:x}", Sha256::digest(library_bytes)));
     }
     std::fs::write(mod_folder.join(MANIFEST_FILE), manifest).expect("the manifest written");
     mod_folder
@@ -108,7 +108,7 @@ main_window :
     assert_eq!((base_manifest.name(), drawn_manifest.name()), ("base", "drawn"));
     let server = &base_manifest.bundles()[1];
     assert_eq!((server.name(), server.fields().side, &server.fields().depends_on[..]), ("base_server", Side::Server, &[bundle_named("base", "base_common")][..]));
-    assert_eq!(server.fields().library_hash, hash_bytes(b"server bytes"));
+    assert_eq!(server.fields().library_hash, format!("0x{:x}", Sha256::digest(b"server bytes")));
     let sheep = &server.types()[0];
     assert_eq!((sheep.kind(), sheep.hooks()), (&Kind::Entity { default_attribute: Some(named("base", "base_common", "sheep_data")) }, &[Hook::KeepsTheWorldHot][..]));
     assert_eq!(base_manifest.bundles()[0].types()[0].kind(), &Kind::Plane { width_bits: 4, tile_size: 8 });

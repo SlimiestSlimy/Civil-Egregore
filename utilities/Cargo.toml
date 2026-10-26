@@ -10,3 +10,4 @@ crate-type = ["dylib"]
 
 [dependencies]
 cdnf = { path = "../cdnf" }
+libloading = { workspace = true }
