@@ -6,6 +6,7 @@
 members = [
     "utilities",
     "protocol",
+    "server",
     "game_packager",
     "mod_packager",
     "AI_SCRATCHPAD",

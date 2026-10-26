@@ -42,9 +42,15 @@ fn main() -> Result<(), String> {
             let loaded = protocol::type_registry::TypeRegistry::of_manifests(&manifests).load(side)?;
             println!("{} libraries loaded", loaded.library_count());
             for registered in loaded.registry().types() {
-                let code = loaded.code_of(registered.type_id()).map_or("no code".to_string(), |code| match code.downcast_ref::<TypeName>() {
-                    Some(type_name) => format!("code, downcast to a TypeName: {type_name}"),
-                    None => "code of a type the probe does not know".to_string(),
+                let code = loaded.code_of(registered.type_id()).map_or("no code".to_string(), |code| {
+                    if let Some(type_name) = code.downcast_ref::<TypeName>() {
+                        format!("code, downcast to a TypeName: {type_name}")
+                    } else if let Some(sca_proc) = code.downcast_ref::<Box<dyn server::sca_proc::ScaProc>>() {
+                        sca_proc.call(&mut server::server_handle::ServerHandle {}, 0, utilities::coordinates::CellIndex(0));
+                        "code, downcast to a sca proc, called".to_string()
+                    } else {
+                        "code of a type the probe does not know".to_string()
+                    }
                 });
                 println!("{:016x} {} -- {code}", registered.type_id(), registered.full_name());
             }

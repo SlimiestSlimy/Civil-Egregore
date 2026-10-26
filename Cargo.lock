@@ -8,6 +8,7 @@ version = "0.0.0"
 dependencies = [
  "cdnf",
  "protocol",
+ "server",
  "sha2",
  "utilities",
 ]
@@ -106,6 +107,14 @@ version = "0.0.0"
 dependencies = [
  "cdnf",
  "sha2",
+ "utilities",
+]
+
+[[package]]
+name = "server"
+version = "0.0.0"
+dependencies = [
+ "protocol",
  "utilities",
 ]
 

@@ -1,0 +1,13 @@
+[package]
+name = "server"
+edition = "2024"
+description = "The simulation: the world's superchunks, ticked by the procs the mods give it, every write under a compare"
+
+# A shared library of its own, as the game ships it: the server binary
+# and the server mods link this one copy.
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+utilities = { path = "../utilities" }
+protocol = { path = "../protocol" }

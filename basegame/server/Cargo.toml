@@ -10,5 +10,7 @@ crate-type = ["dylib"]
 # The source each is developed with; packaging drops it, the compiled
 # libraries given instead.
 [target.'cfg(not(civil_egregore_packaging))'.dependencies]
+utilities = { path = "../../utilities" }
 protocol = { path = "../../protocol" }
+server = { path = "../../server" }
 basegame_common = { path = "../common" }

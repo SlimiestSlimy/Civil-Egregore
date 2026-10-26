@@ -5,6 +5,7 @@
 //! set up function is. Its name its folder's, its premanifest read back
 //! as every premanifest is, before anything is written.
 
+use crate::building::game_libraries;
 use crate::premanifest::PREMANIFEST_FILE;
 use cdnf::writer::CdnfWriter;
 use protocol::manifest_format::{read_mod_document, FormatError};
@@ -42,12 +43,13 @@ pub fn make_a_new_mod(mod_folder: &Path, side: &str) -> Result<(), String> {
     }
     let premanifest = CdnfWriter::new().section(name).list().pair("side").text(side).pair("version").text("0.1").end_list().end_section().finish();
     let document = cdnf::parse(&premanifest).map_err(|cdnf_error| cdnf_error.what)?;
-    read_mod_document(&document).map_err(|FormatError { section, what }| format!("{section}: {what}"))?;
-    let game_protocol = Path::new(env!("CARGO_MANIFEST_DIR")).join("../protocol").canonicalize().map_err(|io_error| format!("the game's protocol: {io_error}"))?;
+    let document = read_mod_document(&document).map_err(|FormatError { section, what }| format!("{section}: {what}"))?;
+    let game_folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").canonicalize().map_err(|io_error| format!("the game's folder: {io_error}"))?;
+    // Developed with the source of each game library packaging gives it.
+    let game_sources: String = game_libraries(document.side).iter().map(|library| format!("{library} = {{ path = '{}' }}\n", game_folder.join(library).display())).collect();
     let channel = option_env!("GAME_CHANNEL").ok_or("the game's toolchain: unknown, the packager not built by rustup")?;
     let cargo_toml = format!(
-        "[package]\nname = \"{name}\"\nedition = \"2024\"\n\n# A mod: one library, loaded by the game.\n[lib]\ncrate-type = [\"dylib\"]\n\n# A workspace of its own, wherever it is.\n[workspace]\n\n# The source it is developed with; packaging drops it, the game's\n# compiled libraries given instead.\n[target.'cfg(not(civil_egregore_packaging))'.dependencies]\nprotocol = {{ path = '{}' }}\n",
-        game_protocol.display()
+        "[package]\nname = \"{name}\"\nedition = \"2024\"\n\n# A mod: one library, loaded by the game.\n[lib]\ncrate-type = [\"dylib\"]\n\n# A workspace of its own, wherever it is.\n[workspace]\n\n# The source it is developed with; packaging drops it, the game's\n# compiled libraries given instead.\n[target.'cfg(not(civil_egregore_packaging))'.dependencies]\n{game_sources}"
     );
     let toolchain = format!("# The game's toolchain: the mod's source built with it, as the packager\n# builds the mod.\n[toolchain]\nchannel = \"{channel}\"\n");
     let files = [("Cargo.toml", cargo_toml.as_str()), ("rust-toolchain.toml", &toolchain), (PREMANIFEST_FILE, &premanifest), (".gitignore", "target/\n"), ("src/lib.rs", LIBRARY_SOURCE)];

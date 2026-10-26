@@ -23,8 +23,30 @@ const BUILD_FOLDER: &str = "target/civil_egregore_build";
 /// developed with -- dropped.
 const PACKAGING_CFG: &str = "civil_egregore_packaging";
 
-/// The game's libraries a mod may use.
-const GAME_LIBRARIES: [&str; 2] = ["utilities", "protocol"];
+/// The game's libraries a mod of the side `side` may use.
+pub fn game_libraries(side: Side) -> &'static [&'static str] {
+    match side {
+        Side::Server => &["utilities", "protocol", "server"],
+        Side::Common | Side::Client => &["utilities", "protocol"],
+    }
+}
+
+/// The game's libraries a mod of the side `side` may use built, as the
+/// game builds them, if they are not -- the packager's run builds only
+/// its own: or why not.
+pub fn build_the_games_libraries(side: Side) -> Result<(), String> {
+    let game_folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut command = on_the_games_toolchain("cargo");
+    command.current_dir(&game_folder).args(["build", "--release"]);
+    for name in game_libraries(side) {
+        command.args(["-p", name]);
+    }
+    let status = command.status().map_err(|io_error| format!("cargo: {io_error}"))?;
+    if !status.success() {
+        return Err(format!("the game's libraries: not built in {}", game_folder.display()));
+    }
+    Ok(())
+}
 
 /// The flags the crate of the mod in `mod_folder` -- whole, its path
 /// canonical -- whose premanifest is `premanifest` and dependencies
@@ -32,12 +54,12 @@ const GAME_LIBRARIES: [&str; 2] = ["utilities", "protocol"];
 /// libraries it may use and where what they were built on is. Or why
 /// none.
 pub fn packaging_flags(mod_folder: &Path, premanifest: &Premanifest, dependencies: &Dependencies) -> Result<Vec<String>, String> {
-    let game_libraries = Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/release/deps").canonicalize().map_err(|io_error| format!("the game's libraries: {io_error}"))?;
+    let game_libraries_folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/release/deps").canonicalize().map_err(|io_error| format!("the game's libraries: {io_error}"))?;
     let extracted = mod_folder.join(EXTRACTED_FOLDER);
     let mut flags: Vec<String> = env!("GAME_RUSTFLAGS").split('\u{1f}').filter(|flag| !flag.is_empty()).map(str::to_string).collect();
     flags.extend(["--cfg".to_string(), PACKAGING_CFG.to_string()]);
-    for name in GAME_LIBRARIES {
-        flags.extend(["--extern".to_string(), format!("{name}={}", game_libraries.join(library_file_name(name)).display())]);
+    for name in game_libraries(premanifest.document().side) {
+        flags.extend(["--extern".to_string(), format!("{name}={}", game_libraries_folder.join(library_file_name(name)).display())]);
     }
     // A mod uses what its side may depend on: indirect dependencies too, loaded before it all the same.
     for manifest in dependencies.manifests.iter().filter(|manifest| !manifest.document().container) {
@@ -45,7 +67,7 @@ pub fn packaging_flags(mod_folder: &Path, premanifest: &Premanifest, dependencie
             flags.extend(["--extern".to_string(), format!("{}={}", manifest.document().name, extracted.join(library_file_name(&manifest.document().name)).display())]);
         }
     }
-    for folder in [&game_libraries, &extracted] {
+    for folder in [&game_libraries_folder, &extracted] {
         flags.extend(["-L".to_string(), format!("dependency={}", folder.display())]);
     }
     Ok(flags)

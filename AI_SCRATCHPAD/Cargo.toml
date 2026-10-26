@@ -8,5 +8,6 @@ description = "The AI's own scratchpad: probes of Civil Egregore, questions aske
 [dependencies]
 utilities = { path = "../utilities" }
 protocol = { path = "../protocol" }
+server = { path = "../server" }
 cdnf = { path = "../cdnf" }
 sha2 = { workspace = true }

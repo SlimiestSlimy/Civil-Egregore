@@ -48,6 +48,7 @@ fn package_the_mod(mod_folder: &std::path::Path) -> Result<(), String> {
     // A container's crate is none: nothing built, nothing to check.
     let mut library = None;
     if !premanifest.document().container {
+        building::build_the_games_libraries(premanifest.document().side)?;
         let flags = building::packaging_flags(mod_folder, &premanifest, &dependencies)?;
         let built = building::build_the_mod(mod_folder, &premanifest, &flags)?;
         set_up_check::check_set_ups(mod_folder, &premanifest, &built, &flags)?;
