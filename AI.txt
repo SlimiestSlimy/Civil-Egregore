@@ -208,6 +208,30 @@ NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
   does the same.
 - Not in the first slice: entities, warming, saving, network, worldgen,
   the client.
+- THE DOUBLE BOX, the user's focus (2026-10-27), design not settled: a
+  sca proc's set up makes a Box<dyn ScaProc> inside the Box<dyn Any> of
+  its TypeCode (downcast_ref::<Box<dyn ScaProc>>()), because dyn Any
+  downcasts to concrete types alone. The user's way: "tailor the setup
+  function output for each type to dyn kindtrait directly, so we never
+  downcast from an any, we downcast from the relevant trait type
+  directly instead". Worked through, not written: a trait a kind (Any +
+  Send + Sync supertraits; server kinds' in server, common kinds' in
+  protocol); a set up type a kind returning Arc<dyn ItsTrait>
+  (ScaProcSetUp, PlaneSetUp, ...); stores by kind on each side; loading
+  in two passes, common mods first in protocol, then the side's, whose
+  handle wraps the common one (a common mod never depends on a server
+  one); a dependent asks by kind and downcasts from the trait, upcast to
+  Arc<dyn Any + Send + Sync> (trait upcasting works on 1.99, one
+  allocation, both views: checked); the packager's set up check writing
+  each kind's own set up type. TypeCode and code_of for any kind go.
+  OPEN, asked: (1) marker traits for kinds whose code is only for their
+  dependents (plane, attribute)? (2) the two passes? (3) Arc, so a
+  dependent keeps what it takes?
+- LEFT FROM THE REVIEW (2026-10-26): utilities and the packagers not
+  reviewed yet; utilities calls a cell's Morton index in its chunk its
+  "place" (CellIndex::place, from_chunk_place) where the server now says
+  "tile index"; the instruction's plane_type_id, "i guess thats right
+  but we might wanna review that".
 
 WAITING ON THE USER
 - Mask / word-of-cells instructions ("this will have to wait").
@@ -220,13 +244,14 @@ OPEN, FOUND BY ME
   symbols come from -C metadata, not the source), and cargo doesn't
   rebuild when an --extern library changes. Nothing checks that a mod
   was built against this build; a stale mod misbehaves quietly. Record a
-  build fingerprint once there is something to version.
+  build fingerprint once there is something to version. Talked over
+  (2026-10-26): packaging rebuilds the game and the mod, so the hole is
+  at load, a zip of an older build. The fingerprint is of the INPUTS --
+  the exact rustc, target, rustflags, profile, the engine's sources --
+  never of the libraries built, which differ machine to machine (debug
+  info's paths) and would refuse mods that work. Even so: "rust does not
+  make such guarantees ... so i cant say for aure the hole is closed".
 - The mod packager's known gap: mod_packager/known_bugs.md.
-- A KIND'S CODE BOXED TWICE (review, 2026-10-26): a sca proc's set up
-  makes a Box<dyn ScaProc> inside the Box<dyn Any> of its TypeCode, got
-  back with downcast_ref::<Box<dyn ScaProc>>(). Every kind with a trait
-  (entity procs, worldgen) would repeat it: decide the pattern once,
-  before they come.
 - A PLANE'S WIDTH TRUSTED AS A u32 (review, 2026-10-26): the manifest
   refuses widths but 1, 2, 4, 8, 16, 32, and everything after holds a
   plain number. An enum of the six would make a bad width impossible to
