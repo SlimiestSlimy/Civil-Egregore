@@ -192,7 +192,8 @@ THE SERVER (0.8; design in force)
 == TO DO ==
 
 NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
-- The order: 1 a chunk's planes (DONE: hot_chunk.rs, plane_shapes.rs);
+- The order: 1 a chunk's planes (DONE: hot_chunk.rs; a plane's width and tile side
+  enums, a new plane's asked of the registry, TypeRegistry::type_of);
   2 the applier, one chunk, one thread (DONE: queue_applier.rs); 3 the queuing
   builder on the handle, tested with real ticks; 4 several chunks, the
   lowering with atomic and fence, applied on ONE thread in global author
@@ -226,9 +227,23 @@ NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
   Arc<dyn Any + Send + Sync> (trait upcasting works on 1.99, one
   allocation, both views: checked); the packager's set up check writing
   each kind's own set up type. TypeCode and code_of for any kind go.
-  OPEN, asked: (1) marker traits for kinds whose code is only for their
-  dependents (plane, attribute)? (2) the two passes? (3) Arc, so a
-  dependent keeps what it takes?
+  Answered (2026-10-27): (1) no marker traits: "the trait itself
+  provides the setup api for a specific kind"; (2) no two passes: "just
+  sort them"; (3) no Arc: everything lives the whole process.
+  Then talked over, not settled: a known set up signature per kind as a
+  newtype, exported as a no_mangle static (`pub static GRASS_TICK_SET_UP:
+  ScaProcSetUp = ScaProcSetUp::of::<GrassTick>()`, a generic const fn
+  boxing the kind trait's `set_up(registry) -> Result<Self, String>`):
+  compiled in the scratchpad, symbol exported, a wrong return E0308 at
+  the mod's own build. Each side loads its own: protocol's registry
+  filtered by side, the side's kinds and loading in the server or client
+  ("let each side handle the loading either server or client, the
+  loading machinery is already shared mostly"); an inherent impl on
+  SideTypeRegistry<ServerSide> from the server is E0116. Kind hooks: a
+  store per hook, each holding what its hook expects, kinds registered
+  into their default hook ("we can have a separate store for every hook
+  type"). Mods to mods: plain linked Rust, code_of likely unneeded. A
+  plane has no code: data alone.
 - LEFT FROM THE REVIEW (2026-10-26): utilities and the packagers not
   reviewed yet; utilities calls a cell's Morton index in its chunk its
   "place" (CellIndex::place, from_chunk_place) where the server now says
@@ -254,10 +269,6 @@ OPEN, FOUND BY ME
   info's paths) and would refuse mods that work. Even so: "rust does not
   make such guarantees ... so i cant say for aure the hole is closed".
 - The mod packager's known gap: mod_packager/known_bugs.md.
-- A PLANE'S WIDTH TRUSTED AS A u32 (review, 2026-10-26): the manifest
-  refuses widths but 1, 2, 4, 8, 16, 32, and everything after holds a
-  plain number. An enum of the six would make a bad width impossible to
-  hold; small, not urgent, the manifest being the one way in.
 
 LATER (every "for later" of the user's, and mine, as said)
 - THE GAME FOLDER WIPED BY EVERY MOD PACKAGED: package_mod runs the game
