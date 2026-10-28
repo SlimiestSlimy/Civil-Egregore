@@ -230,12 +230,15 @@ NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
   Answered (2026-10-27): (1) no marker traits: "the trait itself
   provides the setup api for a specific kind"; (2) no two passes: "just
   sort them"; (3) no Arc: everything lives the whole process.
-  Then talked over, not settled: a known set up signature per kind as a
-  newtype, exported as a no_mangle static (`pub static GRASS_TICK_SET_UP:
-  ScaProcSetUp = ScaProcSetUp::of::<GrassTick>()`, a generic const fn
-  boxing the kind trait's `set_up(registry) -> Result<Self, String>`):
-  compiled in the scratchpad, symbol exported, a wrong return E0308 at
-  the mod's own build. Each side loads its own: protocol's registry
+  DECIDED: a plain #[unsafe(no_mangle)] set up function, its signature
+  the kind's own, returning the kind's trait object directly ("a know
+  function signature per hook/kind that returns a dyn kindype with the
+  corresponding api per kind if necessary"; "we decided a normal
+  no_mangle function with a per-kind signatuee was the way to go"):
+  `pub fn grass_tick_set_up(registry: &TypeRegistry) -> Result<Box<dyn
+  ScaProc>, String>`, the packager's check `const _: ScaProcSetUp =
+  basegame_server::grass_tick_set_up;` per kind; no newtype, no static,
+  no dyn Any. Talked over, not settled: each side loads its own: protocol's registry
   filtered by side, the side's kinds and loading in the server or client
   ("let each side handle the loading either server or client, the
   loading machinery is already shared mostly"); an inherent impl on
