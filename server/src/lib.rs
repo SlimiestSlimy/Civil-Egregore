@@ -3,7 +3,8 @@
 //! chunk as it is ticked ([`hot_chunk`]), the tiles of it sampled
 //! ([`plane_sampling`]), and its queue of instructions
 //! ([`queued_instruction`]) applied to it ([`queue_applier`]); the
-//! mods it runs, loaded ([`mod_loading`]).
+//! mods it runs, loaded ([`mod_loading`]), into all it holds of its
+//! world ([`server_manager`]).
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -16,3 +17,4 @@ pub mod queue_applier;
 pub mod queued_instruction;
 pub mod sca_proc;
 pub mod server_handle;
+pub mod server_manager;

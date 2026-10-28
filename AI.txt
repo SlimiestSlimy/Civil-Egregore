@@ -210,15 +210,31 @@ NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
   order (the reference meaning of a tick; grass across a border is its
   first test); 5 threads, parking at fences, checked equal to 4's run.
   Atomics stay plain counters until 5.
-- STEP 3, co-op file by file. Next: file 2, server_handle.rs -- reads
-  (read_tile, and at an offset, Result<u32, NotHot>), random_numbers(),
-  and the typestate set: set() -> compares -> writes/compares -> ended by
-  a skip tag, panicking on a bad plane or a value too wide. Then the
-  one-chunk tick: take the stream, sample, call procs by TypeId, give
-  the stream back, apply, drop empty planes. Test it with a grass proc
-  ("a sampled grass has a chance of dying, and a slightly bigger chance
-  of spreading") and a determinism check. Then basegame's grass_tick
-  does the same.
+  The user's idea for 5's thread manager (2026-10-28): "making threads
+  objects have a simple start, and poll interface, so threads can do and
+  halt in the middle of arbitrary work ... this is as general purpose as
+  it can be". The old dispatcher (utilities/dispatcher.rs before
+  5ab90004) ran jobs to completion, phases split by full barriers. To
+  design at 5.
+  The run queue: "the run queue is basically the a superhandle to the
+  server state, basically a list of chunks haha, probably well call it a
+  "server_manager_handle, since thats probably the same handle we'll use
+  for another stuff as well".
+- STEP 3 DONE (2026-10-28): server_handle.rs (reads of any hot chunk,
+  Err(NotHot) else; random_stream(); the set's type states
+  SetWithoutCompare -> SetComparing -> SetWriting -> end(), built in a
+  buffer and queued at end alone -- "preferably we push to the queue
+  until we call end"; compares always before writes, "thats our
+  consistency guarantee"); server_manager.rs (ServerManager: the
+  registry, the sca proc store, the hot chunks -- "servermanager is fine
+  yes"; the handle holds it and the ticking chunk's index, no HotChunk:
+  "a serverhandle straight up doesn't need a specific hotchunk
+  reference"); server_manager/tick.rs (two phases: procs on &self, then
+  each queue applied). Tested by a grass proc dying and spreading on two
+  chunks, same seed same grass (tests/fine/tick.rs; test_registry's
+  registry_of_mods takes whole manifests -- "sounds like a convoluted
+  test, but if it works, im fine with it"). Next: basegame's grass_tick
+  given that body; then step 4.
 - Not in the first slice: entities, warming, saving, network, worldgen,
   the client.
 - SET UPS, DONE (2026-10-28): a kind with code has its own set up type,

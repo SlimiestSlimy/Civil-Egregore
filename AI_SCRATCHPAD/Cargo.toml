@@ -8,3 +8,4 @@ description = "The AI's own scratchpad: probes of Civil Egregore it tests with w
 [dependencies]
 protocol = { path = "../protocol" }
 server = { path = "../server" }
+utilities = { path = "../utilities" }

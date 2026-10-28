@@ -5,36 +5,17 @@
 //! IDs and its chance a tick. Nothing is checked, and nothing fails but
 //! by a panic: the manifests were checked, the libraries hashed.
 
-use crate::sca_proc::{ScaProc, ScaProcSetUp};
+use crate::sca_proc::ScaProcSetUp;
+use crate::server_manager::{LoadedScaProc, ServerManager};
 use protocol::type_kinds::{Kind, Side};
 use protocol::type_registry::{RegisteredType, TypeRegistry};
 use std::collections::HashMap;
-use utilities::chance::Chance;
 use utilities::dynamic_library::{library_file_name, DynamicLibrary};
 
-/// A sca proc, loaded: its code, and what it is sampled by.
-pub struct LoadedScaProc {
-    /// Its type ID.
-    pub type_id: u64,
-    /// The type IDs of the planes it is sampled on.
-    pub sampled_plane_type_ids: Vec<u64>,
-    /// The chance a tile not 0 of each of them is sampled for it, a tick.
-    pub chance_per_tick: Chance,
-    /// What its set up made.
-    pub code: Box<dyn ScaProc>,
-}
-
-/// The server's mods, loaded: the registry it sees, and the sca procs.
-pub struct ServerMods {
-    /// The registry, the server's side's alone.
-    pub type_registry: TypeRegistry,
-    /// Every sca proc, in type ID order.
-    pub sca_procs: Vec<LoadedScaProc>,
-}
-
 /// The mods of `type_registry` the server runs -- the common side's and
-/// the server's -- loaded.
-pub fn load_server_mods(type_registry: &TypeRegistry) -> ServerMods {
+/// the server's -- loaded, the server's world made of them, no chunk
+/// hot yet.
+pub fn load_server_mods(type_registry: &TypeRegistry) -> ServerManager {
     let type_registry = type_registry.of_side(Side::Server);
     // Every library opened, each after those it depends on: kept here
     // while their set ups are called, open after.
@@ -65,7 +46,7 @@ pub fn load_server_mods(type_registry: &TypeRegistry) -> ServerMods {
             Kind::Plane { .. } => {}
         }
     }
-    ServerMods { type_registry, sca_procs }
+    ServerManager::new(type_registry, sca_procs)
 }
 
 /// The mods among `types`, in the order they load: each after every mod

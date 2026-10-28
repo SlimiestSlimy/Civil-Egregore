@@ -12,7 +12,7 @@ pub trait ScaProc: Send + Sync {
     /// The tile whose corner cell is `tile_corner`, of the plane of type
     /// ID `sampled_plane_type_id` -- one of those it is sampled on -- seen
     /// through `server`.
-    fn call(&self, server: &mut ServerHandle, sampled_plane_type_id: u64, tile_corner: CellIndex);
+    fn call(&self, server: &mut ServerHandle<'_>, sampled_plane_type_id: u64, tile_corner: CellIndex);
 }
 
 /// A sca proc's set up: the proc, made with what it takes of the
