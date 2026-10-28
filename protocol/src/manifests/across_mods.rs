@@ -3,7 +3,7 @@
 //! every mod depended on there, at the version depended on, of a side
 //! its dependent may depend on -- a common container on any -- and no
 //! ring of them; every type a type names in its own mod or in one it reaches, of
-//! the kind it must be; and no ring of guis nested in each other.
+//! the kind it must be.
 
 use super::{Manifest, ManifestError};
 use crate::type_kinds::{Kind, Side};
@@ -30,8 +30,7 @@ pub(super) fn check_across_mods(manifests: &[Manifest]) -> Result<(), ManifestEr
             check_references(manifest, each_type, &reach, &mods_by_name)?;
         }
     }
-    check_no_ring_of_dependencies(manifests, &mods_by_name)?;
-    check_no_ring_of_guis(manifests, &mods_by_name)
+    check_no_ring_of_dependencies(manifests, &mods_by_name)
 }
 
 /// Whether a mod of the side `dependent` may depend on one of the side
@@ -103,10 +102,7 @@ struct Reference<'kind> {
 /// The types `kind` names: one field's, as many as it names.
 fn references(kind: &Kind) -> Vec<Reference<'_>> {
     let (field, named, of_its_kind, kind_word): (_, Vec<&QualifiedTypeName>, fn(&Kind) -> bool, _) = match kind {
-        Kind::Entity { default_attribute: Some(attribute) } => ("default attribute", vec![attribute], |named| matches!(named, Kind::Attribute { .. }), "attribute"),
-        Kind::EntityProc { entity } => ("entity", vec![entity], |named| matches!(named, Kind::Entity { .. }), "entity"),
         Kind::ScaProc { planes, .. } => ("planes", planes.iter().collect(), |named| matches!(named, Kind::Plane { .. }), "plane"),
-        Kind::Gui { parent: Some(parent) } => ("parent", vec![parent], |named| matches!(named, Kind::Gui { .. }), "gui"),
         _ => return Vec::new(),
     };
     named.into_iter().map(|named| Reference { field, named, of_its_kind, kind_word }).collect()
@@ -165,30 +161,6 @@ fn check_no_ring_of_dependencies(manifests: &[Manifest], mods_by_name: &ModsByNa
     for manifest in manifests {
         if let Some(in_the_ring) = walk(manifest, mods_by_name, &mut walks) {
             return Err(refused(in_the_ring, &in_the_ring.document.name, "depends on itself, through the mods it depends on".to_string()));
-        }
-    }
-    Ok(())
-}
-
-/// No gui nested in itself through its parents.
-fn check_no_ring_of_guis(manifests: &[Manifest], mods_by_name: &ModsByName) -> Result<(), ManifestError> {
-    let type_count: usize = manifests.iter().map(|manifest| manifest.document.types.len()).sum();
-    for manifest in manifests {
-        for gui in &manifest.document.types {
-            let Kind::Gui { parent: mut next_parent } = gui.kind().clone() else { continue };
-            let gui_name = QualifiedTypeName { mod_name: manifest.document.name.clone(), type_name: gui.name().to_string() };
-            // A gui's parents are no more than the types there are; a ring
-            // above it, not through it, is found from a gui of that ring.
-            for _ in 0..=type_count {
-                let Some(parent) = next_parent else { break };
-                if parent == gui_name {
-                    return Err(refused(manifest, &gui_name.to_string(), "parent: nested in itself, through its parents".to_string()));
-                }
-                next_parent = type_named(&parent, mods_by_name).and_then(|parent_type| match parent_type.kind() {
-                    Kind::Gui { parent } => parent.clone(),
-                    _ => None,
-                });
-            }
         }
     }
     Ok(())

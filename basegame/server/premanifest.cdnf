@@ -11,4 +11,4 @@ grass_tick :
 - planes :
     -- basegame_common>grass
 - seconds per sample : 1
-- set up : grass_tick_set_up
+- set up : GRASS_TICK_SET_UP

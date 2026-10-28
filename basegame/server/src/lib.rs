@@ -1,25 +1,20 @@
 //! The base game's server mod: no type of its own yet but
-//! `grass_tick`, a sca proc sampled on grass -- what it makes of it is
-//! what it took of the common mod, grass's export downcast once at
-//! set up: the first thing one mod takes of another.
+//! `grass_tick`, a sca proc sampled on grass, holding grass's type ID
+//! taken from the registry at set up.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-use protocol::type_names::QualifiedTypeName;
-use protocol::type_registry::{TypeCode, TypeRegistryHandle};
-use server::sca_proc::ScaProc;
+use protocol::type_registry::TypeRegistry;
+use server::sca_proc::{ScaProc, ScaProcSetUp};
 use server::server_handle::ServerHandle;
 use utilities::coordinates::CellIndex;
 
-/// What `grass_tick` is made of: grass's qualified name, as the common mod
-/// exported it, and grass's ID.
+/// What `grass_tick` is made of: grass's type ID.
 pub struct GrassTick {
-    /// Grass's qualified name, taken from the common mod's export.
-    pub grass_name: QualifiedTypeName,
-    /// Grass's ID.
-    pub grass_id: u64,
+    /// Grass's type ID.
+    pub grass_type_id: u64,
 }
 
 impl ScaProc for GrassTick {
@@ -27,13 +22,12 @@ impl ScaProc for GrassTick {
     fn call(&self, _server: &mut ServerHandle, _sampled_plane_type_id: u64, _tile_corner: CellIndex) {}
 }
 
-/// `grass_tick` set up: grass's export taken from the common mod,
-/// downcast to what it is, and kept; a sca proc to the server.
-#[unsafe(no_mangle)]
-pub fn grass_tick_set_up(registry: &TypeRegistryHandle<'_>) -> Result<TypeCode, String> {
-    const GRASS: &str = "basegame_common>grass";
-    let grass_export = registry.code_of(GRASS).ok_or_else(|| format!("{GRASS}: nothing made of it"))?;
-    let grass_name = grass_export.downcast_ref::<QualifiedTypeName>().ok_or_else(|| format!("{GRASS}: not a QualifiedTypeName"))?.clone();
-    let grass_id = registry.type_id_of(GRASS).ok_or_else(|| format!("{GRASS}: no such type"))?;
-    Ok(Box::new(Box::new(GrassTick { grass_name, grass_id }) as Box<dyn ScaProc>))
+/// `grass_tick` set up: grass's type ID, taken by its name.
+pub fn grass_tick_set_up(type_registry: &TypeRegistry) -> Box<dyn ScaProc> {
+    let grass_type_id = type_registry.type_id_of("basegame_common>grass").expect("grass, of the common mod this one depends on");
+    Box::new(GrassTick { grass_type_id })
 }
+
+/// `grass_tick`'s set up, as its premanifest names it.
+#[unsafe(no_mangle)]
+pub static GRASS_TICK_SET_UP: ScaProcSetUp = grass_tick_set_up;

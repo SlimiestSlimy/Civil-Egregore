@@ -3,7 +3,7 @@
 //! mod's section, its fields' list, then each type paired with its
 //! fields' list. Its words are the reader's.
 
-use super::type_document_reading::{hook_word, kind_word, side_word};
+use super::type_document_reading::{kind_word, side_word};
 use super::{DeclaredDependency, ModDocument};
 use crate::type_kinds::Kind;
 use cdnf::writer::{CdnfWriter, List, PairRight};
@@ -24,17 +24,10 @@ pub fn write_mod_document(document: &ModDocument) -> String {
         let mut type_fields = mod_section.pair(each_type.name()).list().pair("kind").text(kind_word(each_type.kind()));
         type_fields = match each_type.kind() {
             Kind::Plane { width, tile_side } => type_fields.pair("width").text(width.bits()).pair("tile side").text(tile_side.side_cells()),
-            Kind::Entity { default_attribute: Some(attribute) } => type_fields.pair("default attribute").text(attribute),
-            Kind::Attribute { size_in_blocks } => type_fields.pair("size").text(size_in_blocks),
-            Kind::EntityProc { entity } => type_fields.pair("entity").text(entity),
-            Kind::ScaProc { planes, seconds_per_sample } => texts_field(type_fields, "planes", planes).pair("seconds per sample").text(seconds_per_sample),
-            Kind::RenderProc { draw_order } => type_fields.pair("draw order").text(draw_order),
-            Kind::Gui { parent: Some(parent) } => type_fields.pair("parent").text(parent),
-            Kind::Entity { default_attribute: None } | Kind::Gui { parent: None } | Kind::Worldgen | Kind::ClientCall | Kind::Mod(_) => type_fields,
+            Kind::ScaProc { planes, mean_simulation_seconds_per_sample } => texts_field(type_fields, "planes", planes).pair("seconds per sample").text(mean_simulation_seconds_per_sample),
+            Kind::Mod { .. } => type_fields,
         };
-        let hooks: Vec<&str> = each_type.hooks().iter().map(|&hook| hook_word(hook)).collect();
-        type_fields = texts_field(type_fields, "hooks", &hooks);
-        if let Some(set_up) = each_type.set_up_function_name() {
+        if let Some(set_up) = each_type.set_up_static_name() {
             type_fields = type_fields.pair("set up").text(set_up);
         }
         mod_section = type_fields.end_list();

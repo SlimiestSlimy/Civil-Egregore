@@ -1,5 +1,0 @@
-# Added to the experiment's own flags (prefer-dynamic, $ORIGIN): the
-# shipped libraries as the crates, and where their own dependencies'
-# metadata is.
-[target.x86_64-unknown-linux-gnu]
-rustflags = ["--extern", "engine_server=/home/Slimy/container/programming/Rust/tilesim/AI_SCRATCHPAD/dylib_experiment/target/x86_64-unknown-linux-gnu/release/libengine_server.so", "--extern", "shapes_common=/home/Slimy/container/programming/Rust/tilesim/AI_SCRATCHPAD/dylib_experiment/target/x86_64-unknown-linux-gnu/release/libshapes_common.so", "-L", "dependency=/home/Slimy/container/programming/Rust/tilesim/AI_SCRATCHPAD/dylib_experiment/target/x86_64-unknown-linux-gnu/release/deps", "-L", "dependency=/home/Slimy/container/programming/Rust/tilesim/AI_SCRATCHPAD/dylib_experiment/target/x86_64-unknown-linux-gnu/release"]

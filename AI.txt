@@ -60,7 +60,7 @@ result, and on the goal before the design.
 - Tests take their seed from utilities/test_seed.rs
   (transient_data/test_seed.cdnf). FREEZE_SEED=0x... pins one. The
   binaries never read repo files.
-- Mods are built against the RELEASE game: AI_SCRATCHPAD's `load` runs
+- Mods are built against the RELEASE game: AI_SCRATCHPAD's load probe runs
   with --release. After a public change, repackage basegame and
   ../meadow (`cargo package_mod <folder>`).
 - Names long, human, more than one word. Files are about 300 code
@@ -116,14 +116,24 @@ mods-built-against-the-compiled-game)
   registry (a flat list: IDs, qualified names, no checks). Then loading:
   libraries out of the zips, set up mod by mod, dependencies first. Each
   type's `set up` is #[unsafe(no_mangle)], named in the manifest.
-- Kinds: common -- plane, attribute, client call; server -- entity,
-  entity proc, sca proc, worldgen; client -- render proc, gui. An entity
-  proc names its entity. A sca proc names its `planes` (one or more) and
-  its `seconds per sample`. A plane says its `width` (1, 2, 4, 8, 16 or
-  32 bits) and its `tile side` (1, 2, 4 and so on to 256 cells), held
-  as the enums PlaneWidth and TileSide: no generics in the server ("we
-  get type security benefits without flooding the server with
-  generics"); the reader refuses any other number, `of_` panics.
+- Kinds, only those built (2026-10-28: "we have too many thinga in that
+  enum for what we have working" / "remove the unnecessary yes"): mod,
+  plane (common), sca proc (server); each other kind, and hooks, come
+  back as they are built. The variants keep their fields inline ("dont
+  bring back planeshapes leave the enum as is"). A sca proc names its
+  `planes` (one or more), its `seconds per sample` and its `set up`. A
+  plane says its `width` (1, 2, 4, 8, 16 or 32 bits) and its `tile
+  side` (1, 2, 4 and so on to 256 cells), held as the enums PlaneWidth
+  and TileSide: no generics in the server ("we get type security
+  benefits without flooding the server with generics"); the reader
+  refuses any other number, `of_` panics. A plane has no code, its `set
+  up` refused.
+- Kinds to come and their code, as said: an entity has none, its procs
+  do; attributes do ("maybe not entities, but atributes need setters
+  and getters basically, when we get to entities we work on that");
+  entity procs, worldgen, client calls, render procs and guis do. The
+  old reader had a client call's `set up` optional: required when it
+  comes back.
 
 THE SERVER (0.8; design in force)
 - CHUNKS: a chunk is 1024x1024 cells (formerly the "superchunk"; "lets
@@ -211,42 +221,27 @@ NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
   does the same.
 - Not in the first slice: entities, warming, saving, network, worldgen,
   the client.
-- THE DOUBLE BOX, the user's focus (2026-10-27), design not settled: a
-  sca proc's set up makes a Box<dyn ScaProc> inside the Box<dyn Any> of
-  its TypeCode (downcast_ref::<Box<dyn ScaProc>>()), because dyn Any
-  downcasts to concrete types alone. The user's way: "tailor the setup
-  function output for each type to dyn kindtrait directly, so we never
-  downcast from an any, we downcast from the relevant trait type
-  directly instead". Worked through, not written: a trait a kind (Any +
-  Send + Sync supertraits; server kinds' in server, common kinds' in
-  protocol); a set up type a kind returning Arc<dyn ItsTrait>
-  (ScaProcSetUp, PlaneSetUp, ...); stores by kind on each side; loading
-  in two passes, common mods first in protocol, then the side's, whose
-  handle wraps the common one (a common mod never depends on a server
-  one); a dependent asks by kind and downcasts from the trait, upcast to
-  Arc<dyn Any + Send + Sync> (trait upcasting works on 1.99, one
-  allocation, both views: checked); the packager's set up check writing
-  each kind's own set up type. TypeCode and code_of for any kind go.
-  Answered (2026-10-27): (1) no marker traits: "the trait itself
-  provides the setup api for a specific kind"; (2) no two passes: "just
-  sort them"; (3) no Arc: everything lives the whole process.
-  DECIDED: a plain #[unsafe(no_mangle)] set up function, its signature
-  the kind's own, returning the kind's trait object directly ("a know
-  function signature per hook/kind that returns a dyn kindype with the
-  corresponding api per kind if necessary"; "we decided a normal
-  no_mangle function with a per-kind signatuee was the way to go"):
-  `pub fn grass_tick_set_up(registry: &TypeRegistry) -> Result<Box<dyn
-  ScaProc>, String>`, the packager's check `const _: ScaProcSetUp =
-  basegame_server::grass_tick_set_up;` per kind; no newtype, no static,
-  no dyn Any. Talked over, not settled: each side loads its own: protocol's registry
-  filtered by side, the side's kinds and loading in the server or client
-  ("let each side handle the loading either server or client, the
-  loading machinery is already shared mostly"); an inherent impl on
-  SideTypeRegistry<ServerSide> from the server is E0116. Kind hooks: a
-  store per hook, each holding what its hook expects, kinds registered
-  into their default hook ("we can have a separate store for every hook
-  type"). Mods to mods: plain linked Rust, code_of likely unneeded. A
-  plane has no code: data alone.
+- SET UPS, DONE (2026-10-28): a kind with code has its own set up type,
+  returning its trait object: `ScaProcSetUp = fn(&TypeRegistry) ->
+  Box<dyn ScaProc>` (server/src/sca_proc.rs), no Result -- a failing set
+  up is its mod's bug, a panic. The mod writes a plain `pub fn` and
+  `#[unsafe(no_mangle)] pub static GRASS_TICK_SET_UP: ScaProcSetUp =
+  grass_tick_set_up;` ("what we need to check is that the const to the
+  function with the right signature exists as per the premanifest" /
+  "yup"; a static, a const leaving no symbol). The premanifest's `set
+  up` names the static; the packager's check (set_up_check.rs) compiles
+  `const _: <type> = <mod>::<STATIC>;` plus an extern block and a
+  `#[used]` reference per static, so the linker must find it unmangled.
+  No macros ("lets avoid macros for now"), no newtype, no dyn Any, no
+  code_of. Library loading is out of protocol: "what the protocol type
+  registry has to do ia filter by side" (TypeRegistry::of_side); the
+  server loads (server/src/mod_loading.rs, load_server_mods): libraries
+  opened in load order, then set ups called in type ID order, each sca
+  proc kept with its plane IDs and chance; every failure a panic, no
+  library ever closed. Mods to mods: plain linked Rust (meadow holds
+  basegame_server::GrassTick and calls through it), as libserver links
+  libprotocol. A plane has no code: data alone. Checked end to end:
+  basegame and ../meadow packaged and loaded by AI_SCRATCHPAD.
 - LEFT FROM THE REVIEW (2026-10-26): utilities and the packagers not
   reviewed yet; utilities calls a cell's Morton index in its chunk its
   "place" (CellIndex::place, from_chunk_place) where the server now says
@@ -274,6 +269,15 @@ OPEN, FOUND BY ME
 - The mod packager's known gap: mod_packager/known_bugs.md.
 
 LATER (every "for later" of the user's, and mine, as said)
+- THE LIBRARY TEST'S LIBC (2026-10-28): utilities/tests/fine/
+  dynamic_library.rs opens the system's libc.so.6 and reads its
+  `opterr` -- Linux only, and no library of ours. "note that for later,
+  ita fine as a test but its a hack nontheless". The fix proposed: the
+  test builds its own dylib of one no_mangle static into
+  transient_data and reads it back.
+- THE TICK'S ORDER OF PROCS (2026-10-28): the loader keeps sca procs in
+  type ID order, the registry's; "ugh well sort tick order stuff
+  another day, id order is fine".
 - THE GAME FOLDER WIPED BY EVERY MOD PACKAGED: package_mod runs the game
   packager, which lays target/civil_egregore/ out anew, so basegame.zip
   is gone. "honestly, for now this is not an issue, once the game gets

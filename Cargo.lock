@@ -6,11 +6,8 @@ version = 4
 name = "AI_SCRATCHPAD"
 version = "0.0.0"
 dependencies = [
- "cdnf",
  "protocol",
  "server",
- "sha2",
- "utilities",
 ]
 
 [[package]]

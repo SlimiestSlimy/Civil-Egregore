@@ -1,3 +1,0 @@
-bundle, shapes, common, libshapes_common.so
-bundle, shapes server, server, libshapes_server.so, shapes
-bundle, shapes drawn, client, libshapes_client.so, shapes

@@ -2,7 +2,7 @@
 //! as `cargo new` makes one: its Cargo.toml -- a dylib, a workspace of
 //! its own, the game's source to develop with -- the game's toolchain,
 //! its premanifest, an empty `dependencies/`, and a lib.rs saying what a
-//! set up function is. Its name its folder's, its premanifest read back
+//! set up is. Its name its folder's, its premanifest read back
 //! as every premanifest is, before anything is written.
 
 use crate::building::game_libraries;
@@ -15,20 +15,23 @@ use std::path::Path;
 /// A new mod's lib.rs.
 const LIBRARY_SOURCE: &str = "//! A mod of Civil Egregore's.
 //!
-//! Each type its premanifest names with a `set up` has its set up
-//! function here, at the crate's root, by that name:
+//! Each type its premanifest names with a `set up` has its set up here,
+//! at the crate's root: a function, exported unmangled as a static of
+//! its kind's set up type, by the name the premanifest gives. A sca
+//! proc's:
 //!
 //! ```ignore
-//! #[unsafe(no_mangle)]
-//! pub fn example_set_up(registry: &TypeRegistryHandle<'_>) -> Result<TypeCode, String> {
+//! pub fn example_set_up(type_registry: &TypeRegistry) -> Box<dyn ScaProc> {
 //!     ...
 //! }
+//!
+//! #[unsafe(no_mangle)]
+//! pub static EXAMPLE_SET_UP: ScaProcSetUp = example_set_up;
 //! ```
 //!
-//! (`protocol::type_registry::{TypeCode, TypeRegistryHandle}`). What it
-//! returns is what the game, and the mods depending on this one, get of
-//! the type. Packaged by `cargo package_mod <this folder>`, from the
-//! game's folder.
+//! (`protocol::type_registry::TypeRegistry`,
+//! `server::sca_proc::{ScaProc, ScaProcSetUp}`). Packaged by
+//! `cargo package_mod <this folder>`, from the game's folder.
 ";
 
 /// The mod's crate made in `mod_folder`, none there yet, of the side

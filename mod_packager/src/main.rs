@@ -2,7 +2,7 @@
 //! made into the zip it ships as. Its premanifest read and checked; the
 //! dependencies it gives a source of packaged first, into its
 //! `dependencies/` folder; its dependencies' zips there read and checked;
-//! the mod built against the game and them; its set up functions
+//! the mod built against the game and them; its set up statics
 //! checked; its manifest written; all of it zipped, and read back as the
 //! game reads it.
 //!

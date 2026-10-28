@@ -1,7 +1,7 @@
 //! A smoke test: three mods' manifests, a container among them carrying
 //! one, made into the registry's flat list.
 
-use protocol::type_kinds::{Dependency, Kind, ModFields, PlaneWidth, Side, TileSide};
+use protocol::type_kinds::{Dependency, Kind, PlaneWidth, Side, TileSide};
 use protocol::manifests::read_mods;
 use protocol::mod_packages::{DEPENDENCIES_FOLDER, MANIFEST_FILE, PACKAGE_EXTENSION};
 use protocol::type_registry::{TypeRegistry, KIND_SHIFT};
@@ -81,9 +81,9 @@ water :
     let id = |kind_byte: u64, number: u64| kind_byte << KIND_SHIFT | number;
     assert_eq!(listed, [("base", id(0x09, 0)), ("base>grass", id(0x01, 1)), ("pack", id(0x09, 2)), ("other", id(0x09, 3)), ("other>water", id(0x01, 4))]);
     assert_eq!(registry.types()[4].kind(), &Kind::Plane { width: PlaneWidth::Bits4, tile_side: TileSide::Cells2 });
-    let Kind::Mod(ModFields { side, depends_on, .. }) = registry.types()[3].kind() else { panic!("a mod") };
+    let Kind::Mod { side, depends_on, .. } = registry.types()[3].kind() else { panic!("a mod") };
     assert_eq!((*side, &depends_on[..]), (Side::Common, &[Dependency { mod_name: "base".to_string(), version: "0.1".to_string() }][..]));
-    let Kind::Mod(ModFields { package, .. }) = registry.types()[2].kind() else { panic!("a mod") };
+    let Kind::Mod { package, .. } = registry.types()[2].kind() else { panic!("a mod") };
     assert!(package.is_none(), "a container has no package to read a library from");
     _ = std::fs::remove_dir_all(&test_folder);
 }

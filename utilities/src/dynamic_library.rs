@@ -1,12 +1,11 @@
-//! A dynamic library opened at runtime, and its functions found by name
-//! ([`DynamicLibrary`]): what std has no way to do, asked of the
+//! A dynamic library opened at runtime, and the statics it exports
+//! found by name ([`DynamicLibrary`]): what std has no way to do, asked of the
 //! system's loader through `libloading` -- the one part of the game that
 //! knows its OS.
 //!
 //! A library opened is never closed: code of it may be running, or held
 //! as a pointer, anywhere until the process ends.
 
-use std::ffi::c_void;
 use std::mem::ManuallyDrop;
 use std::path::Path;
 
@@ -46,18 +45,19 @@ impl DynamicLibrary {
         opened
     }
 
-    /// The function the library exports as `name`, as `F` -- a function
-    /// pointer's type -- or what the loader said.
+    /// The value of the static the library exports as `name`, as `T`:
+    /// or what the loader said.
     ///
     /// # Safety
     ///
-    /// `F` must be a function pointer's type, and the very one the library
-    /// defines `name` as: built by the same compiler, the same ABI.
-    pub unsafe fn function<F: Copy>(&self, name: &str) -> Result<F, String> {
-        const { assert!(size_of::<F>() == size_of::<*mut c_void>(), "a function pointer's type") };
-        // SAFETY: the caller's word that `F` is what `name` is.
-        let symbol = unsafe { self.library.get::<F>(name.as_bytes()) }.map_err(|why| format!("`{name}`: {why}"))?;
-        Ok(*symbol)
+    /// `T` must be the very type the library defines `name` as: built by
+    /// the same compiler, the same ABI.
+    pub unsafe fn static_value<T: Copy>(&self, name: &str) -> Result<T, String> {
+        // SAFETY: the caller's word that `T` is what `name` is; a static's
+        // symbol is where it is kept.
+        let symbol = unsafe { self.library.get::<*const T>(name.as_bytes()) }.map_err(|why| format!("`{name}`: {why}"))?;
+        // SAFETY: a static, kept as long as the library, never closed.
+        Ok(unsafe { **symbol })
     }
 }
 

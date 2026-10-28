@@ -1,2 +1,0 @@
-# The game: its build says the rest.
-include = ["../../dylib_experiment/out/modding.toml"]

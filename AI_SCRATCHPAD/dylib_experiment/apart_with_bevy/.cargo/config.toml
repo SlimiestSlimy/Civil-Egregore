@@ -1,4 +1,0 @@
-# The mod's one-time setup: where the game's build is. Added to the
-# experiment's flags (prefer-dynamic, rpath, the paths remapped).
-[target.x86_64-unknown-linux-gnu]
-rustflags = ["--extern", "engine_client=/home/Slimy/container/programming/Rust/tilesim/AI_SCRATCHPAD/dylib_experiment/out/game/libengine_client.so", "--extern", "shapes_client=/home/Slimy/container/programming/Rust/tilesim/AI_SCRATCHPAD/dylib_experiment/out/world/mods/shapes/libshapes_client.so", "-L", "dependency=/home/Slimy/container/programming/Rust/tilesim/AI_SCRATCHPAD/dylib_experiment/out/game", "-L", "dependency=/home/Slimy/container/programming/Rust/tilesim/AI_SCRATCHPAD/dylib_experiment/out/world/mods/shapes"]

@@ -7,7 +7,7 @@
 //! this one gives. And a [`ModDocument`] written back
 //! ([`write_mod_document`]).
 
-use crate::type_kinds::{Dependency, Hook, Kind, Side};
+use crate::type_kinds::{Dependency, Kind, Side};
 use crate::type_names::is_a_name;
 use cdnf::Element;
 use field_list::FieldList;
@@ -68,19 +68,17 @@ impl DeclaredDependency {
     }
 }
 
-/// A type: its name -- no other type's in its mod -- its kind, its
-/// hooks, each one its kind takes, and its set up function's name.
+/// A type: its name -- no other type's in its mod -- its kind, and its
+/// set up's static's name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TypeDocument {
     /// Its name, in its mod.
     name: String,
     /// Its kind, and the kind's fields.
     kind: Kind,
-    /// Its hooks.
-    hooks: Vec<Hook>,
-    /// The name its mod's library exports its set up function as: one a
-    /// type of a kind with code has, any other may.
-    set_up_function_name: Option<String>,
+    /// The name its mod's library exports its set up as: one a type of a
+    /// kind with code has, no other.
+    set_up_static_name: Option<String>,
 }
 
 impl TypeDocument {
@@ -94,14 +92,9 @@ impl TypeDocument {
         &self.kind
     }
 
-    /// Its hooks.
-    pub fn hooks(&self) -> &[Hook] {
-        &self.hooks
-    }
-
-    /// The name its set up function is exported as, if it has one.
-    pub fn set_up_function_name(&self) -> Option<&str> {
-        self.set_up_function_name.as_deref()
+    /// The name its set up's static is exported as, if it has one.
+    pub fn set_up_static_name(&self) -> Option<&str> {
+        self.set_up_static_name.as_deref()
     }
 }
 
