@@ -119,9 +119,11 @@ mods-built-against-the-compiled-game)
 - Kinds: common -- plane, attribute, client call; server -- entity,
   entity proc, sca proc, worldgen; client -- render proc, gui. An entity
   proc names its entity. A sca proc names its `planes` (one or more) and
-  its `seconds per sample`. A plane says its `width` (1 to 32 bits) and
-  its `tile scale`, 0 to 8: tiles 2^n cells a side ("1 yes, 0-8 and
-  2^n").
+  its `seconds per sample`. A plane says its `width` (1, 2, 4, 8, 16 or
+  32 bits) and its `tile side` (1, 2, 4 and so on to 256 cells), held
+  as the enums PlaneWidth and TileSide: no generics in the server ("we
+  get type security benefits without flooding the server with
+  generics"); the reader refuses any other number, `of_` panics.
 
 THE SERVER (0.8; design in force)
 - CHUNKS: a chunk is 1024x1024 cells (formerly the "superchunk"; "lets
@@ -295,6 +297,10 @@ LATER (every "for later" of the user's, and mine, as said)
 - Dynamic reads (frame to frame, tick to tick): "we probably keep it
   fixed now and add dynamicity on that front later if needed".
 - Mod-defined hooks: "mod hooks are the way, for waaay later indeed".
+- A SET UP GIVEN THE SERVER HANDLE (2026-10-27): the user sketched
+  `fn setup(server handle, etc)` on the sca proc's trait; told a set up
+  gets the registry alone (the server not running at load): "about
+  setup being where i put it, that might be useful later".
 - SAMPLING'S COST, from the review (2026-10-26), "fair, for another
   day": corners_of_non_zero_tiles reads every tile of a plane and
   sample_plane draws once a tile not 0 -- a 1-bit plane full of grass,

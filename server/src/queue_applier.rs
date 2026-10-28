@@ -6,11 +6,12 @@
 
 use crate::hot_chunk::HotChunk;
 use crate::queued_instruction::{Instruction, Opcode};
-use crate::plane_shapes::PlaneShapes;
+use protocol::type_registry::TypeRegistry;
 use utilities::coordinates::CellIndex;
 
-/// `instructions`, the queue of `chunk`, applied to it in order.
-pub fn apply_queue(chunk: &mut HotChunk, instructions: &[Instruction], plane_shapes: &PlaneShapes) {
+/// `instructions`, the queue of `chunk`, applied to it in order: a
+/// plane a write makes, made as `type_registry` says.
+pub fn apply_queue(chunk: &mut HotChunk, instructions: &[Instruction], type_registry: &TypeRegistry) {
     let mut next = 0;
     while let Some(instruction) = instructions.get(next) {
         next += 1;
@@ -22,10 +23,7 @@ pub fn apply_queue(chunk: &mut HotChunk, instructions: &[Instruction], plane_sha
                 next += to_the_tag.map_or(instructions.len() - next, |skipped| skipped + 1);
             }
             Opcode::Compare | Opcode::SkipTag => {}
-            Opcode::Write => {
-                let shape = plane_shapes.of(instruction.plane_type_id()).expect("a plane's type ID");
-                chunk.write_tile(instruction.plane_type_id(), shape, cell, instruction.value());
-            }
+            Opcode::Write => chunk.write_tile(instruction.plane_type_id(), cell, instruction.value(), type_registry),
         }
     }
 }

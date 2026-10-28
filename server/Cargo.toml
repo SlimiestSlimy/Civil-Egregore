@@ -12,6 +12,8 @@ crate-type = ["dylib"]
 utilities = { path = "../utilities" }
 protocol = { path = "../protocol" }
 
-# Its tests read their seed file, written in CDNF.
+# Its tests read their seed file, written in CDNF, and hash the
+# libraries of the packages they write.
 [dev-dependencies]
 cdnf = { path = "../cdnf" }
+sha2 = { workspace = true }

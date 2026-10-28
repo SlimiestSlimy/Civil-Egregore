@@ -12,3 +12,5 @@ mod hot_chunk;
 mod plane_sampling;
 #[path = "fine/queue_applier.rs"]
 mod queue_applier;
+#[path = "fine/test_registry.rs"]
+mod test_registry;

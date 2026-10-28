@@ -2,8 +2,7 @@
 //! ([`sca_proc`]), and what they see of it ([`server_handle`]); a
 //! chunk as it is ticked ([`hot_chunk`]), the tiles of it sampled
 //! ([`plane_sampling`]), and its queue of instructions
-//! ([`queued_instruction`]) applied to it ([`queue_applier`]) by its
-//! planes' shapes ([`plane_shapes`]).
+//! ([`queued_instruction`]) applied to it ([`queue_applier`]).
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -11,7 +10,6 @@
 
 pub mod hot_chunk;
 pub mod plane_sampling;
-pub mod plane_shapes;
 pub mod queue_applier;
 pub mod queued_instruction;
 pub mod sca_proc;

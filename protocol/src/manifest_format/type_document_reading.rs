@@ -4,7 +4,7 @@
 use super::field_list::FieldList;
 use super::{not_a_name, TypeDocument};
 use cdnf::Element;
-use crate::type_kinds::{Hook, Kind, Side};
+use crate::type_kinds::{Hook, Kind, PlaneWidth, Side, TileSide};
 use crate::simulation_time::SimulationSeconds;
 use crate::type_names::{is_a_name, QualifiedTypeName, NAME_SEPARATOR};
 
@@ -13,12 +13,6 @@ const SIDE_WORDS: [(Side, &str); 3] = [(Side::Common, "common"), (Side::Server, 
 
 /// Each hook, and its words.
 const HOOK_WORDS: [(Hook, &str); 3] = [(Hook::GeneratesTheWorld, "generates the world"), (Hook::KeepsTheWorldHot, "keeps the world hot"), (Hook::ShownByDefault, "shown by default")];
-
-/// The widths a plane's number may be, in bits.
-const PLANE_WIDTHS: [u32; 6] = [1, 2, 4, 8, 16, 32];
-
-/// The largest tile scale: tiles 2^8, 256, cells a side.
-const LARGEST_TILE_SCALE: u32 = 8;
 
 /// The largest attribute, in blocks.
 const LARGEST_ATTRIBUTE: u32 = 256;
@@ -43,14 +37,14 @@ pub(super) fn read_type(mod_name: &str, type_name: &str, items: &[Element]) -> R
     let kind = match fields.text("kind")? {
         "plane" => {
             let width_bits = number_of(fields.text("width")?)?;
-            let tile_scale = number_of(fields.text("tile scale")?)?;
-            if !PLANE_WIDTHS.contains(&width_bits) {
-                return Err(format!("width: one of {PLANE_WIDTHS:?} bits, not {width_bits}"));
+            let side_cells = number_of(fields.text("tile side")?)?;
+            if !PlaneWidth::ALL.iter().any(|width| width.bits() == width_bits) {
+                return Err(format!("width: 1, 2, 4, 8, 16 or 32 bits, not {width_bits}"));
             }
-            if tile_scale > LARGEST_TILE_SCALE {
-                return Err(format!("tile scale: 0 to {LARGEST_TILE_SCALE}, tiles 2^scale cells a side, not {tile_scale}"));
+            if !TileSide::ALL.iter().any(|tile_side| tile_side.side_cells() == side_cells) {
+                return Err(format!("tile side: 1, 2, 4 and so on to 256 cells, not {side_cells}"));
             }
-            Kind::Plane { width_bits, tile_scale }
+            Kind::Plane { width: PlaneWidth::of_bits(width_bits), tile_side: TileSide::of_side_cells(side_cells) }
         }
         "entity" => Kind::Entity { default_attribute: fields.optional_text("default attribute")?.map(reference).transpose()? },
         "attribute" => {

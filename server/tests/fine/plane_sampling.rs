@@ -3,7 +3,6 @@
 
 use server::hot_chunk::HotChunk;
 use server::plane_sampling::sample_plane;
-use server::plane_shapes::PlaneShape;
 use utilities::chance::Chance;
 use utilities::coordinates::{CellIndex, ChunkIndex, CELLS_IN_CHUNK};
 use utilities::rng::RandomSource;
@@ -17,15 +16,17 @@ fn tiles_not_zero_sampled_at_the_chance() {
     let mut random_numbers = RandomSource::new(seed);
     let chunk_index = ChunkIndex(random_numbers.draw_below(1 << 20));
     let mut chunk = HotChunk::new(chunk_index, seed);
-    let (plane_type_id, shape) = (random_numbers.next_draw(), PlaneShape { width_bits: 8, tile_scale: random_numbers.draw_below(5) as u32 });
-    let tile_cells = shape.tile_cells();
+    let side_cells = 1 << random_numbers.draw_below(5);
+    let (type_registry, plane_type_ids) = crate::test_registry::registry_of_planes("plane_sampling", &[(8, side_cells)]);
+    let plane_type_id = plane_type_ids[0];
+    let tile_cells = (side_cells * side_cells) as usize;
     // Tiles drawn, one written at a cell drawn inside it.
     let mut non_zero_tiles: Vec<CellIndex> = (0..4000).map(|_| random_numbers.draw_below((CELLS_IN_CHUNK / tile_cells) as u64) as usize).map(|tile| CellIndex::from_chunk_place(chunk_index, tile * tile_cells)).collect();
     non_zero_tiles.sort();
     non_zero_tiles.dedup();
     for &tile in &non_zero_tiles {
         let cell_in_it = CellIndex(tile.0 + random_numbers.draw_below(tile_cells as u64));
-        chunk.write_tile(plane_type_id, shape, cell_in_it, 1 + random_numbers.draw_below(255) as u32);
+        chunk.write_tile(plane_type_id, cell_in_it, 1 + random_numbers.draw_below(255) as u32, &type_registry);
     }
     let hits_at = |chance: Chance, random_stream: &mut RandomSource| {
         let mut hits = Vec::new();

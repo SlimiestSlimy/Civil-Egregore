@@ -111,4 +111,10 @@ impl TypeRegistry {
     pub fn types(&self) -> &[RegisteredType] {
         &self.types
     }
+
+    /// The type of ID `type_id`, an ID the registry gave out: its number
+    /// its place in the list.
+    pub fn type_of(&self, type_id: u64) -> &RegisteredType {
+        &self.types[(type_id % TYPE_ID_NUMBERS) as usize]
+    }
 }

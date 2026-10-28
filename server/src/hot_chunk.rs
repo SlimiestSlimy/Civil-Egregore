@@ -3,7 +3,8 @@
 //! chunk, counting its tiles that are not 0, what sampling goes by -- and
 //! its random stream, where its tick draws from.
 
-use crate::plane_shapes::PlaneShape;
+use protocol::type_kinds::{Kind, PlaneWidth, TileSide};
+use protocol::type_registry::TypeRegistry;
 use utilities::coordinates::{CellIndex, ChunkIndex, CELLS_IN_CHUNK};
 use utilities::rng::RandomSource;
 
@@ -15,7 +16,7 @@ pub struct HotChunk {
     random_stream_state: u64,
     /// Its planes, sorted by type ID: one emptied stays until the tick's
     /// end ([`HotChunk::drop_empty_planes`]).
-    planes: Vec<HotPlane>,
+    planes: Vec<Plane>,
 }
 
 impl HotChunk {
@@ -45,19 +46,21 @@ impl HotChunk {
     /// holding `cell`, a cell of this chunk: 0 if it keeps no such plane.
     pub fn read_tile(&self, plane_type_id: u64, cell: CellIndex) -> u32 {
         debug_assert_eq!(cell.chunk(), self.chunk_index, "a cell of another chunk");
-        self.plane(plane_type_id).map_or(0, |hot_plane| hot_plane.read(cell.place()))
+        self.plane(plane_type_id).map_or(0, |plane| plane.read(cell.place()))
     }
 
-    /// Makes `value` the number the plane of type ID `plane_type_id`, of
-    /// the shape `shape` its type says, holds at the tile holding `cell`, a
-    /// cell of this chunk. `value` fits the plane's numbers.
-    pub fn write_tile(&mut self, plane_type_id: u64, shape: PlaneShape, cell: CellIndex, value: u32) {
+    /// Makes `value` the number the plane of type ID `plane_type_id`
+    /// holds at the tile holding `cell`, a cell of this chunk: a plane it
+    /// keeps none of made as `type_registry` says. `value` fits the
+    /// plane's numbers.
+    pub fn write_tile(&mut self, plane_type_id: u64, cell: CellIndex, value: u32, type_registry: &TypeRegistry) {
         debug_assert_eq!(cell.chunk(), self.chunk_index, "a cell of another chunk");
-        let place = match self.planes.binary_search_by_key(&plane_type_id, |hot_plane| hot_plane.plane_type_id) {
+        let place = match self.planes.binary_search_by_key(&plane_type_id, |plane| plane.plane_type_id) {
             Ok(place) => place,
             Err(_) if value == 0 => return,
             Err(place) => {
-                self.planes.insert(place, HotPlane::new(plane_type_id, shape));
+                let &Kind::Plane { width, tile_side } = type_registry.type_of(plane_type_id).kind() else { panic!("{plane_type_id:#x} is no plane's type ID") };
+                self.planes.insert(place, Plane::new(plane_type_id, width, tile_side));
                 place
             }
         };
@@ -66,64 +69,68 @@ impl HotChunk {
 
     /// How many tiles of the plane of type ID `plane_type_id` are not 0.
     pub fn non_zero_tiles(&self, plane_type_id: u64) -> u32 {
-        self.plane(plane_type_id).map_or(0, |hot_plane| hot_plane.non_zero_tiles)
+        self.plane(plane_type_id).map_or(0, |plane| plane.non_zero_tiles)
     }
 
     /// The corner cell of each tile not 0 of the plane of type ID
     /// `plane_type_id`, in Morton order: every tile of it looked at.
     pub fn corners_of_non_zero_tiles(&self, plane_type_id: u64) -> impl Iterator<Item = CellIndex> + '_ {
         let chunk_index = self.chunk_index;
-        self.plane(plane_type_id).into_iter().flat_map(move |hot_plane| {
-            (0..CELLS_IN_CHUNK).step_by(hot_plane.tile_cells).filter(|&place| hot_plane.read(place) != 0).map(move |place| CellIndex::from_chunk_place(chunk_index, place))
+        self.plane(plane_type_id).into_iter().flat_map(move |plane| {
+            (0..CELLS_IN_CHUNK).step_by(plane.tile_cells()).filter(|&place| plane.read(place) != 0).map(move |place| CellIndex::from_chunk_place(chunk_index, place))
         })
     }
 
     /// The planes whose every tile is 0 let go: the tick's end.
     pub fn drop_empty_planes(&mut self) {
-        self.planes.retain(|hot_plane| hot_plane.non_zero_tiles > 0);
+        self.planes.retain(|plane| plane.non_zero_tiles > 0);
     }
 
     /// The plane of type ID `plane_type_id`, if it keeps one.
-    fn plane(&self, plane_type_id: u64) -> Option<&HotPlane> {
-        self.planes.binary_search_by_key(&plane_type_id, |hot_plane| hot_plane.plane_type_id).ok().map(|place| &self.planes[place])
+    fn plane(&self, plane_type_id: u64) -> Option<&Plane> {
+        self.planes.binary_search_by_key(&plane_type_id, |plane| plane.plane_type_id).ok().map(|place| &self.planes[place])
     }
 }
 
 /// One plane over one chunk, dense: every tile's number, packed by
 /// its width, in Morton order -- a tile's cells one after another in
 /// it, so a tile is its cells' place over its cells' count.
-struct HotPlane {
+struct Plane {
     /// The plane's type ID.
     plane_type_id: u64,
-    /// Bits a number: 1, 2, 4, 8, 16 or 32.
-    width_bits: u32,
-    /// Cells a tile.
-    tile_cells: usize,
-    /// The numbers, `64 / width_bits` a word.
+    /// How many bits a number.
+    width: PlaneWidth,
+    /// How many cells a tile's side.
+    tile_side: TileSide,
+    /// The numbers, packed by their width.
     words: Vec<u64>,
     /// How many tiles are not 0.
     non_zero_tiles: u32,
 }
 
-impl HotPlane {
-    /// The plane of type ID `plane_type_id`, of the shape `shape`, every
-    /// tile 0.
-    fn new(plane_type_id: u64, shape: PlaneShape) -> Self {
-        let tile_cells = shape.tile_cells();
-        let bits = CELLS_IN_CHUNK / tile_cells * shape.width_bits as usize;
-        Self { plane_type_id, width_bits: shape.width_bits, tile_cells, words: vec![0; bits.div_ceil(u64::BITS as usize)], non_zero_tiles: 0 }
+impl Plane {
+    /// The plane of type ID `plane_type_id`, its numbers `width` wide,
+    /// its tiles `tile_side` a side, every tile 0.
+    fn new(plane_type_id: u64, width: PlaneWidth, tile_side: TileSide) -> Self {
+        let bits = CELLS_IN_CHUNK / tile_side.tile_cells() as usize * width.bits() as usize;
+        Self { plane_type_id, width, tile_side, words: vec![0; bits.div_ceil(u64::BITS as usize)], non_zero_tiles: 0 }
+    }
+
+    /// Cells a tile.
+    fn tile_cells(&self) -> usize {
+        self.tile_side.tile_cells() as usize
     }
 
     /// The word and the bit in it the number of the tile holding the cell
     /// at `place` in the chunk starts at.
     fn word_and_bit(&self, place: usize) -> (usize, u32) {
-        let bit = place / self.tile_cells * self.width_bits as usize;
+        let bit = place / self.tile_cells() * self.width.bits() as usize;
         (bit / u64::BITS as usize, (bit % u64::BITS as usize) as u32)
     }
 
     /// A number's bits, all set.
     fn number_mask(&self) -> u64 {
-        u64::MAX >> (u64::BITS - self.width_bits)
+        u64::MAX >> (u64::BITS - self.width.bits())
     }
 
     /// The number of the tile holding the cell at `place`.
@@ -135,7 +142,7 @@ impl HotPlane {
     /// Makes `value` the number of the tile holding the cell at `place`,
     /// counting the tiles not 0.
     fn write(&mut self, place: usize, value: u32) {
-        debug_assert!(u64::from(value) <= self.number_mask(), "{value} is wider than {} bits", self.width_bits);
+        debug_assert!(u64::from(value) <= self.number_mask(), "{value} is wider than {} bits", self.width.bits());
         let (word, bit) = self.word_and_bit(place);
         let held = (self.words[word] >> bit & self.number_mask()) as u32;
         self.words[word] = self.words[word] & !(self.number_mask() << bit) | u64::from(value) << bit;

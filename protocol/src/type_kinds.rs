@@ -44,6 +44,102 @@ pub struct ModFields {
     pub package: Option<PackagePath>,
 }
 
+/// How many bits a plane's number is: one of the widths there are, so
+/// no other can be held.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlaneWidth {
+    /// 1 bit.
+    Bits1,
+    /// 2 bits.
+    Bits2,
+    /// 4 bits.
+    Bits4,
+    /// 8 bits.
+    Bits8,
+    /// 16 bits.
+    Bits16,
+    /// 32 bits.
+    Bits32,
+}
+
+impl PlaneWidth {
+    /// Every width, narrowest first.
+    pub const ALL: [Self; 6] = [Self::Bits1, Self::Bits2, Self::Bits4, Self::Bits8, Self::Bits16, Self::Bits32];
+
+    /// Its bits.
+    pub const fn bits(self) -> u32 {
+        match self {
+            Self::Bits1 => 1,
+            Self::Bits2 => 2,
+            Self::Bits4 => 4,
+            Self::Bits8 => 8,
+            Self::Bits16 => 16,
+            Self::Bits32 => 32,
+        }
+    }
+
+    /// The width of `bits` bits: one there is, the manifest's reader
+    /// having refused any other.
+    pub fn of_bits(bits: u32) -> Self {
+        Self::ALL.into_iter().find(|width| width.bits() == bits).unwrap_or_else(|| panic!("{bits} bits: no plane's width"))
+    }
+}
+
+/// How many cells a side a plane's tile is: one of the sides there are,
+/// so no other can be held.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TileSide {
+    /// A tile a cell.
+    Cells1,
+    /// 2 cells a side.
+    Cells2,
+    /// 4 cells a side.
+    Cells4,
+    /// 8 cells a side.
+    Cells8,
+    /// 16 cells a side.
+    Cells16,
+    /// 32 cells a side.
+    Cells32,
+    /// 64 cells a side.
+    Cells64,
+    /// 128 cells a side.
+    Cells128,
+    /// 256 cells a side.
+    Cells256,
+}
+
+impl TileSide {
+    /// Every side, smallest first.
+    pub const ALL: [Self; 9] = [Self::Cells1, Self::Cells2, Self::Cells4, Self::Cells8, Self::Cells16, Self::Cells32, Self::Cells64, Self::Cells128, Self::Cells256];
+
+    /// Cells a tile's side.
+    pub const fn side_cells(self) -> u32 {
+        match self {
+            Self::Cells1 => 1,
+            Self::Cells2 => 2,
+            Self::Cells4 => 4,
+            Self::Cells8 => 8,
+            Self::Cells16 => 16,
+            Self::Cells32 => 32,
+            Self::Cells64 => 64,
+            Self::Cells128 => 128,
+            Self::Cells256 => 256,
+        }
+    }
+
+    /// Cells a tile.
+    pub const fn tile_cells(self) -> u32 {
+        self.side_cells() * self.side_cells()
+    }
+
+    /// The side of `side_cells` cells: one there is, the manifest's
+    /// reader having refused any other.
+    pub fn of_side_cells(side_cells: u32) -> Self {
+        Self::ALL.into_iter().find(|tile_side| tile_side.side_cells() == side_cells).unwrap_or_else(|| panic!("{side_cells} cells: no tile's side"))
+    }
+}
+
 /// A type's kind, and that kind's fields: each type it names there of
 /// the kind it must be.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,11 +148,10 @@ pub enum Kind {
     Mod(ModFields),
     /// A plane: a number a cell, or a tile.
     Plane {
-        /// Bits a number: 1, 2, 4, 8, 16 or 32.
-        width_bits: u32,
-        /// A tile is `2^tile_scale` cells a side: 0 for a number a
-        /// cell, 8 the most, 256 a side.
-        tile_scale: u32,
+        /// Bits a number.
+        width: PlaneWidth,
+        /// Cells a tile's side.
+        tile_side: TileSide,
     },
     /// A type of entity.
     Entity {

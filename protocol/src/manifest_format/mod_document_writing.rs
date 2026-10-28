@@ -23,7 +23,7 @@ pub fn write_mod_document(document: &ModDocument) -> String {
     for each_type in &document.types {
         let mut type_fields = mod_section.pair(each_type.name()).list().pair("kind").text(kind_word(each_type.kind()));
         type_fields = match each_type.kind() {
-            Kind::Plane { width_bits, tile_scale } => type_fields.pair("width").text(width_bits).pair("tile scale").text(tile_scale),
+            Kind::Plane { width, tile_side } => type_fields.pair("width").text(width.bits()).pair("tile side").text(tile_side.side_cells()),
             Kind::Entity { default_attribute: Some(attribute) } => type_fields.pair("default attribute").text(attribute),
             Kind::Attribute { size_in_blocks } => type_fields.pair("size").text(size_in_blocks),
             Kind::EntityProc { entity } => type_fields.pair("entity").text(entity),

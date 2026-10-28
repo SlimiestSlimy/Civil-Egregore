@@ -3,7 +3,7 @@
 //! libraries hashed as their manifests say -- and what is wrong among
 //! them refused.
 
-use protocol::type_kinds::{Hook, Kind, Side};
+use protocol::type_kinds::{Hook, Kind, PlaneWidth, Side, TileSide};
 use protocol::manifest_format::{read_mod_document, write_mod_document, DeclaredDependency};
 use protocol::manifests::read_mods;
 use protocol::mod_packages::{DEPENDENCIES_FOLDER, MANIFEST_FILE, PACKAGE_EXTENSION};
@@ -69,7 +69,7 @@ fn five_mods_read_as_written() {
 grass :
 - kind : plane
 - width : 4
-- tile scale : 3
+- tile side : 8
 
 sheep_data :
 - kind : attribute
@@ -153,7 +153,7 @@ meadow_grows :
     assert_eq!(names, ["base", "base_common", "base_server", "drawn", "meadow"]);
     let [container, common, server, drawn, meadow] = manifests.as_slice() else { panic!("five mods") };
     assert_eq!(server.package().to_string(), format!("{} > dependencies/base_server.zip", mods[0].display()));
-    assert_eq!(common.document().types[0].kind(), &Kind::Plane { width_bits: 4, tile_scale: 3 });
+    assert_eq!(common.document().types[0].kind(), &Kind::Plane { width: PlaneWidth::Bits4, tile_side: TileSide::Cells8 });
     assert_eq!((server.document().side, &server.document().depends_on[..]), (Side::Server, &[DeclaredDependency { mod_name: "base_common".to_string(), version: "0.1".to_string(), source: None }][..]));
     assert_eq!(server.document().hash, Some(format!("0x{:x}", Sha256::digest(b"server bytes"))));
     let sheep = &server.document().types[0];
@@ -222,7 +222,7 @@ grass_dies :
     let looped = ":looped:\n- side : client\n- version : 1\n- hash : {hash}\n\nfirst :\n- kind : gui\n- parent : second\n- set up : first_set_up\n\nsecond :\n- kind : gui\n- parent : first\n- set up : second_set_up\n";
     let refusal = refusal_of(&mods, mod_made(&test_folder, "looped", Some(b"bytes"), looped));
     assert!(refusal.contains("parent: nested in itself, through its parents"), "{refusal}");
-    let twice = ":twice:\n- side : common\n- version : 1\n- hash : {hash}\n\nwater :\n- kind : plane\n- width : 1\n- tile scale : 0\n\nwater :\n- kind : plane\n- width : 8\n- tile scale : 0\n";
+    let twice = ":twice:\n- side : common\n- version : 1\n- hash : {hash}\n\nwater :\n- kind : plane\n- width : 1\n- tile side : 1\n\nwater :\n- kind : plane\n- width : 8\n- tile side : 1\n";
     let refusal = refusal_of(&mods, mod_made(&test_folder, "twice", Some(b"bytes"), twice));
     assert!(refusal.contains("a type named twice: water"), "{refusal}");
     let off_side = ":off_side:\n- side : common\n- version : 1\n- hash : {hash}\n\nsheep :\n- kind : entity\n";
@@ -236,7 +236,7 @@ grass_dies :
 #[test]
 fn every_field_written_reads_back() {
     let documents = [
-        ":kinds_common:\n- side : common\n- version : 1.0 \"beta\"\n- hash : 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n- depends on :\n    -- other : 2\n\nwater :\n- kind : plane\n- width : 8\n- tile scale : 4\n\nhealth :\n- kind : attribute\n- size : 2\n\nask :\n- kind : client call\n- set up : ask_set_up\n",
+        ":kinds_common:\n- side : common\n- version : 1.0 \"beta\"\n- hash : 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n- depends on :\n    -- other : 2\n\nwater :\n- kind : plane\n- width : 8\n- tile side : 16\n\nhealth :\n- kind : attribute\n- size : 2\n\nask :\n- kind : client call\n- set up : ask_set_up\n",
         ":kinds_server:\n- side : server\n- version : 0.1\n- depends on :\n    -- kinds_common : 1.0\n- carried dependencies :\n    - carried_one :\n        - version : 3\n        -- source : ../carried_one\n    -- carried_two : 4\n\nsheep :\n- kind : entity\n- default attribute : kinds_common>health\n- hooks :\n    -- keeps the world hot\n\nwolf :\n- kind : entity\n\nsheep_walks :\n- kind : entity proc\n- entity : sheep\n- set up : sheep_walks_set_up\n\nwater_flows :\n- kind : sca proc\n- planes :\n    - kinds_common>water\n    -- other>lava\n- seconds per sample : 12.5\n- set up : water_flows_set_up\n\nislands :\n- kind : worldgen\n- hooks :\n    -- generates the world\n- set up : islands_set_up\n",
         ":kinds_client:\n- side : client\n- version : 0.1\n\nwater_drawn :\n- kind : render proc\n- draw order : 3\n- set up : water_drawn_set_up\n\nmenu :\n- kind : gui\n- hooks :\n    -- shown by default\n- set up : menu_set_up\n\nsubmenu :\n- kind : gui\n- parent : menu\n- set up : submenu_set_up\n",
         ":kinds_container:\n- side : server\n- version : 0.1\n- container mod\n- carried dependencies :\n    -- kinds_server : 0.1\n",
