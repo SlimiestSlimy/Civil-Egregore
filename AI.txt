@@ -298,6 +298,8 @@ LATER (every "for later" of the user's, and mine, as said)
   folder of its own, not a git repository; the game takes it from
   crates.io. Next for the format: "left side keys of
   more than a single element type".
+- exp-newserver IS FROZEN (2026-10-30): "no commits should be done to
+  that branch anymore". Locked on GitHub, refusing every push.
 - CDNF'S SMOKEPASS (2026-10-30): "later we make a smokepass/ to compare
   parses to expected results". ../cdnf/cdnf.cdnf holds all that is allowed
   and is only checked to read; ../cdnf/tests/smokefail/ holds only what
