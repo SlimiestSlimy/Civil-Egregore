@@ -23,6 +23,8 @@ dependencies = [
 [[package]]
 name = "cdnf"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10f0da20350bd7abdc2dbe9c0518c71aad6f046eb0388c8efaf43239b5395e0e"
 
 [[package]]
 name = "cfg-if"

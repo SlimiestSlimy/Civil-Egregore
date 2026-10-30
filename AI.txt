@@ -3,7 +3,7 @@ reads them, the rules it works by, what is settled and in force, and
 what is left to do. Plain text on purpose. Read it at the start of every
 session and before every task. It stays short: a task done is removed,
 a note that no longer holds is deleted. History is git's (the long
-versions up to d019445, d26a6128 and 54d8ed94); old decisions worth
+versions up to 7433a5a, e7dbce31 and 17874a4c); old decisions worth
 keeping are in the AI's memory ("if you want to keep old info from
 AI.txt use your memory", 2026-10-26).
 
@@ -78,8 +78,7 @@ THE TREE (2026-10-26)
   manifest_format, manifests, packages, simulation_time, type_names,
   type_registry), server (step 3 below), game_packager,
   game_distribution, mod_packager, and AI_SCRATCHPAD (mine; nothing
-  depends on it). Workspaces of their own: tessera, cdnf (its rules in
-  cdnf/cdnf.cdnf), and basegame (a common container mod: basegame_common
+  depends on it). Workspaces of their own: tessera, and basegame (a common container mod: basegame_common
   and basegame_server). meadow lives outside the tree at ../meadow, the
   off-site mod. reference/ holds the old code and is not built: hindsight.
 - Aliases: `cargo package_game`, `cargo package_mod <folder>` (and
@@ -213,7 +212,7 @@ NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
   objects have a simple start, and poll interface, so threads can do and
   halt in the middle of arbitrary work ... this is as general purpose as
   it can be". The old dispatcher (utilities/dispatcher.rs before
-  5ab90004) ran jobs to completion, phases split by full barriers. To
+  396fe08b) ran jobs to completion, phases split by full barriers. To
   design at 5.
   The run queue: "the run queue is basically the a superhandle to the
   server state, basically a list of chunks haha, probably well call it a
@@ -234,7 +233,7 @@ NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
   registry_of_mods takes whole manifests -- "sounds like a convoluted
   test, but if it works, im fine with it"). Next: basegame's grass_tick
   given that body; then step 4.
-- CDNF FIRST (2026-10-30): the new rules are in main (845d9147), the
+- CDNF FIRST (2026-10-30): the new rules are in main (daeb17cb), the
   parser still reads the old ones. "keep it for after we fix cdnf": step
   4 waits, its shape not yet agreed: set() -> compare_and_write(...)+ ->
   compare(...)* -> end(), lowered as compares then writes ("instead of
@@ -294,12 +293,14 @@ OPEN, FOUND BY ME
 LATER (every "for later" of the user's, and mine, as said)
 - CDNF ON CRATES.IO (2026-10-30): "truth is, i actually want to publish
   cdnf to crates.io haha, so were making it better". 0.1.0, `Unlicense
-  OR MIT`, the rest of the repo all rights reserved. Waiting on a token
-  from the user. After it: "left side keys of more than a single element
-  type".
+  OR MIT`, the rest of the repo all rights reserved. Published
+  2026-10-30, the name reserved. It lives at ../cdnf since then, a
+  folder of its own, not a git repository; the game takes it from
+  crates.io. Next for the format: "left side keys of
+  more than a single element type".
 - CDNF'S SMOKEPASS (2026-10-30): "later we make a smokepass/ to compare
-  parses to expected results". cdnf/cdnf.cdnf holds all that is allowed
-  and is only checked to read; cdnf/tests/smokefail/ holds only what
+  parses to expected results". ../cdnf/cdnf.cdnf holds all that is allowed
+  and is only checked to read; ../cdnf/tests/smokefail/ holds only what
   must be refused.
 - THE LIBRARY TEST'S LIBC (2026-10-28): utilities/tests/fine/
   dynamic_library.rs opens the system's libc.so.6 and reads its

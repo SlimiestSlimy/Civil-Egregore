@@ -1,7 +1,7 @@
 # Every crate of Civil Egregore's engine, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.
-# Tessera and CDNF are projects of their own, with their own workspaces
-# and tests; the base game a workspace of its own, built as a mod is.
+# Tessera is a project of its own, with its own workspace and tests; the
+# base game a workspace of its own, built as a mod is.
 [workspace]
 members = [
     "utilities",
@@ -12,7 +12,7 @@ members = [
     "mod_packager",
     "AI_SCRATCHPAD",
 ]
-exclude = ["tessera", "cdnf", "basegame"]
+exclude = ["tessera", "basegame"]
 resolver = "3"
 
 # The game's one version.
@@ -26,6 +26,9 @@ repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 # a bare minimum, each one in place of what would be the game's own to
 # keep up for every OS.
 [workspace.dependencies]
+# The format of every file the game reads, a project of its own
+# (Unlicense or MIT).
+cdnf = "0.1.0"
 # The system's loader, on every OS (ISC).
 libloading = "0.8"
 # SHA-256, a library's hash: hard to forge (MIT or Apache-2.0).

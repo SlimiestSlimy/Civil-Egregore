@@ -6,5 +6,5 @@ description = "Civil Egregore's mod packager: a mod's premanifest checked, the m
 [dependencies]
 utilities = { path = "../utilities" }
 protocol = { path = "../protocol" }
-cdnf = { path = "../cdnf" }
+cdnf = { workspace = true }
 sha2 = { workspace = true }

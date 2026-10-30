@@ -13,4 +13,4 @@ libloading = { workspace = true }
 
 # Its tests read their seed file, written in CDNF.
 [dev-dependencies]
-cdnf = { path = "../cdnf" }
+cdnf = { workspace = true }

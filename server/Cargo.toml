@@ -15,5 +15,5 @@ protocol = { path = "../protocol" }
 # Its tests read their seed file, written in CDNF, and hash the
 # libraries of the packages they write.
 [dev-dependencies]
-cdnf = { path = "../cdnf" }
+cdnf = { workspace = true }
 sha2 = { workspace = true }

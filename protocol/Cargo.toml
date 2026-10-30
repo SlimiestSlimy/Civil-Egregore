@@ -10,5 +10,5 @@ crate-type = ["dylib"]
 
 [dependencies]
 utilities = { path = "../utilities" }
-cdnf = { path = "../cdnf" }
+cdnf = { workspace = true }
 sha2 = { workspace = true }
