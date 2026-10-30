@@ -216,7 +216,7 @@ fn every_field_written_reads_back() {
     ];
     for text in documents {
         let read = read_mod_document(&cdnf::parse(text).expect("parsed")).expect("a mod document");
-        let written = write_mod_document(&read);
+        let written = write_mod_document(&read).expect("its name a section's");
         let read_back = read_mod_document(&cdnf::parse(&written).expect("written parses")).expect("written is a mod document");
         assert_eq!(read_back, read, "{written}");
     }

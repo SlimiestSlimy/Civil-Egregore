@@ -63,18 +63,35 @@ A backslash followed by anything but a quote is just a backslash, like C:\Window
 To keep a backslash right before a quote, write two, like \\" this.
 A quoted text can't end in a backslash, so this one ends in a dot."
 
+A writer refuses a text that has to be quoted and ends in a backslash.
+
+an empty text : ""
+
+"a quoted left: with a colon" : "and a quoted right"
+
+"a quoted text" <:-> with a comment after it
+
+- "a quoted item"
+- "a quoted left in an item" : its right
+
 Outside quotes, a quote is plain text, like "this" in the middle of a text body.
 
+he said "hi" : a quote in the left of a pair is plain text too
+
+A quote starting a later line of a text body
+"is plain text" as well.
+
 A quoted text body can be followed by a colon that makes a pair, or by a newline.
+No text body can follow a quoted text on the same line it finishes.
 
 
 ::::when to quote::::
 
 Only a text that would otherwise read as something else needs quotes, one that:
 - holds a colon followed by a space or a line end
-- starts a line with one or two dashes and a space
+- starts a line with one or two dashes and a space, or is a line of just those
 - starts a line with a colon
-- holds a comment mark at a line's start or after a space
+- holds a comment mark
 - starts with a quote
 - has spaces at its start or end, or empty lines inside
 - is empty
@@ -94,11 +111,20 @@ a time : 12:54 <:-> parses to ("a time", "12:54")
 
 name:value <:-> parses to the single text "name:value"
 
+a right starting with a colon : :right
+
+two colons in a row:: right <:-> parses to ("two colons in a row:", "right")
+
 a pair of a list :
 - the list's first item
 - its last item
 
 The right part of a pair can start after any number of spaces or newlines as follows.
+
+a left over
+two lines : and a right over
+        three lines
+    of any indentation
 
 left of a very long pair:
 
@@ -124,6 +150,8 @@ The list goes on while more items follow. Empty lines are valid between list ite
 
 An item's element always starts on its dash's line, so lists nest only through a pair's colon.
 
+One or two dashes with no element on their line are an empty list element, which is a parse error.
+
 
 ::::dashes::::
 
@@ -131,7 +159,6 @@ Any other dashes at a line's start are just text, so these lines are one plain t
 -5 degrees
 --no space after the dashes
 --- three dashes and a space
--
 
 A dash anywhere but at a line's start is plain text, even right after a colon.
 
@@ -150,6 +177,27 @@ runs on two lines
 
 A list nested in another has its last item marked with 2 dashes instead, when the end of the nested list would be ambiguous otherwise.
 
+everything at once :
+- one
+- two : paired
+
+- three
+  on two lines
+- nested :
+    - inner one
+    -- inner two
+- back in the outer list
+-       spaced out       :       xd
+- two deep :
+    -- one deep :
+        - c1
+        -- c2
+- back after two lists ended at once
+-- nested again :
+    -- inner three
+
+after the list
+
 nesting :
 - an item
 - an item holding a list :
@@ -165,6 +213,22 @@ nesting :
 :::headers:::
 
 A line of a number of colons, a non empty text body without newlines, and the same number of colons again is a section header.
+The colons start the line, no spaces can come before them, and nothing but a comment can come after the last ones.
+
+What's between the colons is a text body like any other, under the same rules : ":12:54:"
+
+A line that starts with a colon and is not a section header is a parse error.
+
+
+::::"a quoted header: with a colon"::::  <:-> and a comment after it
+
+A section can hold anything a document can.
+
+
+::::12:54::::
+
+
+::::        a spaced out name        ::::
 
 A section's header example in a pair : "::example section header ::"
 
@@ -205,6 +269,8 @@ part of that newline, and the invisible byte order mark some editors put at a fi
 
 Spaces around a dash or a colon mean nothing. Indentation is for human reader clarity alone.
 
+a pair of tabs	:	its right
+
 Any run of empty lines, including lines of only spaces, is equivalent to 2 newlines.
 
 
@@ -212,21 +278,34 @@ Any run of empty lines, including lines of only spaces, is equivalent to 2 newli
 
 the comment mark : "<:->"
 
-A comment mark opens a comment, running to its line's end, it means
+A comment mark opens a comment anywhere outside a quoted text, running to its line's end, it means
 nothing and is ignored. <:-> like this one
 
-A comment mark opens a comment only at a line's start, or after at least one space.
-Glued to the text before it, it is just text, like in this<:->that.
+Comments are treated as non existent, so a text glued to the mark simply ends there.
+
+this is a text<:->and this is a comment
 
 A hash is plain text, so colors and markdown headings need no quotes.
 
-A comment after a colon counts as that line's end, so the colon still makes a pair,
+A colon before a comment is a colon at its line's end, so it still makes a pair,
 its element starting on the next line.
 
 items: <:-> the list below
 - an item
 - another item
 
-Glued to the colon, the mark is text, and so is the colon, so items:<:-> is a single text.
+items:<:-> the same pair, the mark glued to the colon
+- an item
 
 A line holding only a comment is not considered a blank line or existent at all.
+<:-> so this text body
+goes on through it.
+
+
+:a second section of the first level:
+
+Sections of the same level can follow one another.
+
+
+:a last one, its elements a list:
+- the last item

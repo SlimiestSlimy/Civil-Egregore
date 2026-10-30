@@ -194,8 +194,7 @@ THE SERVER (0.8; design in force)
   writes are allowed to proceed)" / "an atomic is always tied to a skip
   tag". The lowering happens only where needed: "the public compare and
   write api is oblivious to superchunk boundaries". "yeah we have to wait
-  on the atomic bruv"; a waiting chunk parks. "compares without writes
-  are valid in this model". The tenth queue is gone. Entities across
+  on the atomic bruv"; a waiting chunk parks. The tenth queue is gone. Entities across
   chunks: memory, entities-across-chunks-design.
 
 
@@ -235,6 +234,14 @@ NOW -- THE SERVER, FROM THE TAIL (2026-10-26)
   registry_of_mods takes whole manifests -- "sounds like a convoluted
   test, but if it works, im fine with it"). Next: basegame's grass_tick
   given that body; then step 4.
+- CDNF FIRST (2026-10-30): the new rules are in main (845d9147), the
+  parser still reads the old ones. "keep it for after we fix cdnf": step
+  4 waits, its shape not yet agreed: set() -> compare_and_write(...)+ ->
+  compare(...)* -> end(), lowered as compares then writes ("instead of
+  having compares, and writes, we would hace compares, and compares and
+  writes. otherwise the semantics remain equal"); 9 queues ("no thing
+  can affect any other thing beyond 1024 blocks in one tick, simulation
+  lightspeed"); a compare on a chunk not hot fails, no panic.
 - Not in the first slice: entities, warming, saving, network, worldgen,
   the client.
 - SET UPS, DONE (2026-10-28): a kind with code has its own set up type,
@@ -285,6 +292,15 @@ OPEN, FOUND BY ME
 - The mod packager's known gap: mod_packager/known_bugs.md.
 
 LATER (every "for later" of the user's, and mine, as said)
+- CDNF ON CRATES.IO (2026-10-30): "truth is, i actually want to publish
+  cdnf to crates.io haha, so were making it better". 0.1.0, `Unlicense
+  OR MIT`, the rest of the repo all rights reserved. Waiting on a token
+  from the user. After it: "left side keys of more than a single element
+  type".
+- CDNF'S SMOKEPASS (2026-10-30): "later we make a smokepass/ to compare
+  parses to expected results". cdnf/cdnf.cdnf holds all that is allowed
+  and is only checked to read; cdnf/tests/smokefail/ holds only what
+  must be refused.
 - THE LIBRARY TEST'S LIBC (2026-10-28): utilities/tests/fine/
   dynamic_library.rs opens the system's libc.so.6 and reads its
   `opterr` -- Linux only, and no library of ours. "note that for later,

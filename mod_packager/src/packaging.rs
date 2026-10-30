@@ -23,7 +23,7 @@ pub fn make_the_package(mod_folder: &Path, premanifest: &Premanifest, library: O
     let read = |path: &Path| std::fs::read(path).map_err(|io_error| format!("{}: {io_error}", path.display()));
     let library_bytes = library.map(read).transpose()?;
     let hash = library_bytes.as_deref().map(|bytes| format!("0x{:x}", Sha256::digest(bytes)));
-    let manifest = write_mod_document(&premanifest.manifest(hash));
+    let manifest = write_mod_document(&premanifest.manifest(hash)).map_err(|cdnf_error| cdnf_error.what)?;
     let library_file = library_file_name(&premanifest.document().name);
     let mut carried = Vec::new();
     for carried_dependency in &premanifest.document().carried_dependencies {

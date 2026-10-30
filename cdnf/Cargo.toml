@@ -1,6 +1,8 @@
 [package]
 name = "cdnf"
+version = "0.1.0"
 edition = "2024"
+license = "Unlicense OR MIT"
 description = "The Colon Dash and Newline Format: natural text a program reads too, read and written"
 
 # A project of its own, apart from Civil Egregore's workspace: its tests

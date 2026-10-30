@@ -8,6 +8,7 @@
 use crate::building::game_libraries;
 use crate::premanifest::PREMANIFEST_FILE;
 use cdnf::writer::CdnfWriter;
+use cdnf::CdnfError;
 use protocol::manifest_format::{read_mod_document, FormatError};
 use protocol::mod_packages::DEPENDENCIES_FOLDER;
 use std::path::Path;
@@ -34,6 +35,11 @@ const LIBRARY_SOURCE: &str = "//! A mod of Civil Egregore's.
 //! `cargo package_mod <this folder>`, from the game's folder.
 ";
 
+/// The premanifest of a new mod named `name` of the side `side`.
+fn new_premanifest(name: &str, side: &str) -> Result<String, CdnfError> {
+    Ok(CdnfWriter::new().section(name)?.list().pair("side")?.text(side)?.pair("version")?.text("0.1")?.end_list().end_section().finish())
+}
+
 /// The mod's crate made in `mod_folder`, none there yet, of the side
 /// `side`: or why not.
 pub fn make_a_new_mod(mod_folder: &Path, side: &str) -> Result<(), String> {
@@ -44,7 +50,7 @@ pub fn make_a_new_mod(mod_folder: &Path, side: &str) -> Result<(), String> {
     if !protocol::type_names::is_a_name(name) {
         return Err(format!("{}: its folder's name, the mod's, one character or more, each of A-Z, a-z, 0-9 and _", mod_folder.display()));
     }
-    let premanifest = CdnfWriter::new().section(name).list().pair("side").text(side).pair("version").text("0.1").end_list().end_section().finish();
+    let premanifest = new_premanifest(name, side).map_err(|cdnf_error| cdnf_error.what)?;
     let document = cdnf::parse(&premanifest).map_err(|cdnf_error| cdnf_error.what)?;
     let document = read_mod_document(&document).map_err(|FormatError { section, what }| format!("{section}: {what}"))?;
     let game_folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").canonicalize().map_err(|io_error| format!("the game's folder: {io_error}"))?;

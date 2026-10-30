@@ -72,7 +72,7 @@ impl Parser {
             Some(Token::Quoted(_)) => {
                 let Some(Token::Quoted(quoted)) = self.take() else { unreachable!("peeked") };
                 if matches!(self.peek(), Some(Token::Text(_))) {
-                    return self.refused("after a quote, a colon or the line's end");
+                    return self.refused("no text body can follow a quoted text on the same line it finishes");
                 }
                 Element::Text(quoted)
             }
@@ -86,15 +86,18 @@ impl Parser {
         Ok(Element::Pair(Box::new(first), Box::new(self.element()?)))
     }
 
-    /// A list: a dash and the element after it, an item each, while a
-    /// dash follows the last -- blank lines between let be -- until the
-    /// item of two dashes, its last: so a list nested in an item ends,
-    /// and the one it is in goes on.
+    /// A list: a dash and the element after it on its line, an item
+    /// each, while a dash follows the last -- blank lines between let be
+    /// -- until the item of two dashes, its last: so a list nested in an
+    /// item ends, and the one it is in goes on.
     fn list(&mut self) -> Result<Element, CdnfError> {
         let mut items = Vec::new();
         while let Some(dash @ (Token::Dash | Token::LastDash)) = self.peek() {
             let last_item = *dash == Token::LastDash;
             self.next += 1;
+            if matches!(self.peek(), None | Some(Token::LineEnd | Token::BlankLine)) {
+                return self.refused("an empty list element");
+            }
             items.push(self.element()?);
             if last_item {
                 break;
