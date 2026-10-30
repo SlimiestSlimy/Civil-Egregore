@@ -1,65 +1,154 @@
-# The rules of CDNF, written in CDNF: this file reads as it says.
+The rules of CDNF, written in CDNF: This file parses as valid cdnf.
+
 
 :cdnf:
 
-The Colon Dash and Newline Format is natural text a program can read
-too. A plain message is already a document, and its few marks are the
-ones people write by hand anyway, colons, dashes and line ends.
+The Colon Dash and Newline Format is a natural text format designed to be computer parseable too.
+A plain message is already a document, and its few marks are the
+ones people write by hand anyway, colons, dashes and new lines.
 
-Everything is text. A value is never a number, nor a true or a false,
-only the text it is written as, and what it means is its reader's to
-say.
+Quotes are a last resort. Every rule here is made so that natural text
+needs as few of them as possible.
+
 
 ::elements::
 
-Every element is one of three kinds, and nothing else.
-
-kinds :
+There are 3 types of elements on cdnf files:
 - a text body
 - a pair : what comes before a colon, and the element after it
--- a list : items, each opened by a dash
+- a list : items, each started by one or two dashes at the beginning of a line
 
-::text bodies::
+CDNF has no data types other than text, and sections and elements are purely structural.
 
-A text body runs on until a blank line, or until another element
-starts. One line end inside it is part of it, so this body is one
-text over three lines.
 
-Spaces at a line's start and end mean nothing, so a body may be
-indented however it reads best.
+:::text bodies:::
 
-Any run of empty lines is one blank line. A line holding only a
-comment is no line at all, and parts nothing.
+A text body runs on until a blank line, or until a pair or a list item starts.
+One newline inside a text body is part of it, so this body is
+three lines.
 
-::pairs::
 
-A colon anywhere but at a line's start makes a pair, of what came
-before it and the next element after it, whatever kind that is.
+::::plain text body examples::::
+
+An ASCII table can also be written directly as a text body. Since its
+lines begin with a pipe rather than a dash or a colon, CDNF treats the
+whole table as an ordinary text element.
+
+| name    | age | city   |
+|---------|-----|--------|
+| alice   | 25  | tokyo  |
+| bob     | 39  | LA     |
+| charlie | 19  | Paris  |
+
+Times, links, paths, colors, negative numbers and headings are all plain text:
+- a time : 12:54
+- a link : https://example.com
+- a path : C:\Windows\System32\
+- a color : #ff8800
+- a negative number : -5
+- a heading : # Title
+
+
+::::quoted text bodies::::
+
+Where an element starts, a quote opens a quoted text body, running to the
+next quote. Everything between is kept as written, colons, dashes,
+comment marks and blank lines too. A backslash before a quote escapes it.
+
+a quoted text body : "colons : and - dashes <:-> stay
+as they are,
+
+blank lines too, and \"quotes\" are kept by being escaped.
+A backslash followed by anything but a quote is just a backslash, like C:\Windows\.
+To keep a backslash right before a quote, write two, like \\" this.
+A quoted text can't end in a backslash, so this one ends in a dot."
+
+Outside quotes, a quote is plain text, like "this" in the middle of a text body.
+
+A quoted text body can be followed by a colon that makes a pair, or by a newline.
+
+
+::::when to quote::::
+
+Only a text that would otherwise read as something else needs quotes, one that:
+- holds a colon followed by a space or a line end
+- starts a line with one or two dashes and a space
+- starts a line with a colon
+- holds a comment mark at a line's start or after a space
+- starts with a quote
+- has spaces at its start or end, or empty lines inside
+- is empty
+
+
+:::pairs:::
+
+A colon makes a pair when spaces or a newline follow it, anywhere but at a line's start.
+The pair is of what came before it and the next element after it, whatever element that is.
+A colon followed by anything else is just text, like the ones in 12:54, http://example.com or C:\Windows\System32.
 
 a pair : its right
 
-a pair of a pair : left : right
+a pair of a pair : left : right <:-> parses to ("a pair of a pair", (left, right))
+
+a time : 12:54 <:-> parses to ("a time", "12:54")
+
+name:value <:-> parses to the single text "name:value"
 
 a pair of a list :
 - the list's first item
--- its last item
+- its last item
 
-The right may start on the line after the colon, even after a blank
-line.
+The right part of a pair can start after any number of spaces or newlines as follows.
 
-A text on the line right after a pair's text right is more of that
-text, so pairs one after another are parted by blank lines, or made a
-list's items.
+left of a very long pair:
 
-::lists::
 
-A dash at a line's start opens a list's item, and two dashes open its
-last one, after which the list has ended. A list with no last item
-ends at whatever comes after a blank line and is no item. A line
-right after an item's text, with no dash, is more of that text.
 
-A list nested in another ends on two dashes, or the outer list's next
-items would join it.
+right of a very long pair
+
+
+
+Note: A text body on the right side of a pair, followed by more text on the very next line forms a single text body. For example:
+
+text body 1 : text
+body 2 : text body 3 <:-> parses as (text body 1, (text\nbody 2, text body 3))
+
+So pairs one after another are parted by a blank line, or written as list items.
+
+
+:::lists:::
+
+A list item is a line of any spaces, exactly one or two dashes, at least one space, and an element
+starting on that same line, any element but a section header.
+The list goes on while more items follow. Empty lines are valid between list items.
+
+An item's element always starts on its dash's line, so lists nest only through a pair's colon.
+
+
+::::dashes::::
+
+Any other dashes at a line's start are just text, so these lines are one plain text body:
+-5 degrees
+--no space after the dashes
+--- three dashes and a space
+-
+
+A dash anywhere but at a line's start is plain text, even right after a colon.
+
+leftside: - rightside <:-> parses as ("leftside", "- rightside")
+
+- - an item whose text starts with a dash <:-> parses as ["- an item whose text starts with a dash"]
+
+
+::::ending lists::::
+
+A list ends when any element other than a list item follows it.
+
+A line right after an item's text, with no dashes, is more of that text, not a new element:
+- an item whose text
+runs on two lines
+
+A list nested in another has its last item marked with 2 dashes instead, when the end of the nested list would be ambiguous otherwise.
 
 nesting :
 - an item
@@ -68,39 +157,76 @@ nesting :
     -- the inner list's last item
 - back in the outer list
 -- two lists ending at once :
-    -- the inner list's one item
+    - the inner list's one item
 
-Spaces around a dash or a colon mean nothing. Indentation is for the
-eye alone, nested lists a step deeper.
 
 ::sections::
 
-A line of colons, a name, and as many colons again is a section's
-line. One colon on each side opens a section of the document, two a
-subsection of the one before, and so on. Its colons start the line,
-with no space before them.
+:::headers:::
 
-a section's line : "::name::"
+A line of a number of colons, a non empty text body without newlines, and the same number of colons again is a section header.
 
-A section holds its own elements first, then its subsections. The
-elements before any section are the document's own.
+A section's header example in a pair : "::example section header ::"
 
-::quotes::
+A header's name can be a quoted text body, when it needs one : ":::\"a header: with a colon\":::"
 
-Where an element starts, a quote opens a quoted text, running to the
-next quote. Everything between is kept as written, colons, dashes,
-hashes and blank lines too. A backslash before a quote or another
-backslash escapes it.
 
-a quoted text : "colons : and - dashes # stay
-as they are,
+:::levels:::
 
-blank lines too, and a \"quote\" escaped"
+Sections can be recursively nested by using more colons. However only the necessary amount of colons may be used, example:
+"
+:first level:
+:::third level???:::
+"
+is invalid because we lacked the level 2 header to reach level 3.
 
-A quote anywhere else is text, like the ones in he said "hi". After a
-closing quote, only a colon or the line's end may come.
+The first section of any document is always level 1: ":this is a level 1 header example, single colon:"
 
-::comments::
 
-A hash opens a comment, running to its line's end, and it means
-nothing.   # like this one
+:::scope:::
+
+Sections are greedy, anything after a section header is considered to be under that section.
+
+A header closes all previous sections with equal or deeper level of nesting.
+
+The elements before any section are the document's own and don't form part of any section.
+
+
+::spacing and comments::
+
+:::spacing:::
+
+What counts as a space, a newline or an empty line is whatever a reader sees as one.
+Tabs and any other blank characters are spaces, a carriage return before a newline is
+part of that newline, and the invisible byte order mark some editors put at a file's start is nothing.
+
+        Spaces at a text body line's start and end mean nothing, so a text body may be
+        indented however it reads best.
+
+Spaces around a dash or a colon mean nothing. Indentation is for human reader clarity alone.
+
+Any run of empty lines, including lines of only spaces, is equivalent to 2 newlines.
+
+
+:::comments:::
+
+the comment mark : "<:->"
+
+A comment mark opens a comment, running to its line's end, it means
+nothing and is ignored. <:-> like this one
+
+A comment mark opens a comment only at a line's start, or after at least one space.
+Glued to the text before it, it is just text, like in this<:->that.
+
+A hash is plain text, so colors and markdown headings need no quotes.
+
+A comment after a colon counts as that line's end, so the colon still makes a pair,
+its element starting on the next line.
+
+items: <:-> the list below
+- an item
+- another item
+
+Glued to the colon, the mark is text, and so is the colon, so items:<:-> is a single text.
+
+A line holding only a comment is not considered a blank line or existent at all.
